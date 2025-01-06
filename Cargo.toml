@@ -1,0 +1,13 @@
+[package]
+name = "string_art"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bresenham = "0.1.1"
+image = "0.25.5"
+num-traits = "0.2.19"
+palette = "0.7.6"
+
+[dev-dependencies]
+rand = "0.8.5"
