@@ -1,0 +1,11 @@
+# Ignorar la carpeta target en todo el proyecto
+/target/
+
+# Ignorar todos los archivos .jpg, .png y .svg, excepto los que estén en carpetas example
+*.jpg
+*.png
+*.svg
+
+# Excluir de la regla anterior los archivos en directorios example
+!*/example/*.jpg
+!*/example/*.png

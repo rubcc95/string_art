@@ -1,0 +1,17 @@
+[package]
+name = "string_art"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+num-traits = { workspace = true }
+palette = { workspace = true }
+bresenham = "0.1.1"
+image = { workspace = true }
+num_cpus = "1.16.0"
+rand = { version = "0.8.5", features = ["small_rng"] }
+rayon = "1.10.0"
+svg = "0.18.0"
+
+[dev-dependencies]
+rand = "0.8.5"
