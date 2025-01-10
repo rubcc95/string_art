@@ -1,13 +1,11 @@
-[package]
-name = "string_art"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+members = [
+    "string_art",
+    "string_art_cli",
+    "string_art_ui",
+]
 
-[dependencies]
-bresenham = "0.1.1"
-image = "0.25.5"
+[workspace.dependencies]
 num-traits = "0.2.19"
 palette = "0.7.6"
-
-[dev-dependencies]
-rand = "0.8.5"
+image = "0.25.5"
