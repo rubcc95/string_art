@@ -1,7 +1,7 @@
 pub mod circular;
 
-pub use circular::Circular;
 use crate::Float;
+pub use circular::Circular;
 use svg::Node;
 
 use crate::geometry::{Point, Segment};
@@ -17,17 +17,17 @@ pub trait Builder {
 }
 
 pub unsafe trait Links: IntoIterator<Item = Self::Link> {
-    type Link: Copy + Into<usize>;
+    type Link: Copy + Into<usize> + Send + Sync;
 
     const LEN: usize;
     const SQ_LEN: usize = Self::LEN * Self::LEN;
 }
 
-pub trait Handle : Copy{
+pub trait Handle: Copy {
     type Scalar: Float;
     type Nail: Copy;
     type Links: Links<Link = Self::Link>;
-    type Link: Copy + Into<usize>;
+    type Link: Copy + Into<usize> + Send + Sync;
 
     const LINKS: Self::Links;
 

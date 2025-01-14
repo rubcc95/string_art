@@ -1,18 +1,18 @@
-use crate::{geometry::Point, Float, Grid};
+use crate::{geometry::Point, Float, Grid, Lab};
 use image::{DynamicImage, GenericImageView, Rgb32FImage, RgbImage, Rgba32FImage, RgbaImage};
 use num_traits::AsPrimitive;
 use palette::{FromColor, Srgb};
 use std::ops::Deref;
 
-pub type Lab<T> = palette::Lab<palette::white_point::D65, T>;
+
 
 #[derive(Clone)]
-pub struct LabImage<T> {
+pub struct Image<T> {
     pixels: Vec<Lab<T>>,
     grid: Grid,
 }
 
-impl<T: Float> From<DynamicImage> for LabImage<T>
+impl<T: Float> From<DynamicImage> for Image<T>
 where
     u8: AsPrimitive<T>,
 {
@@ -36,7 +36,7 @@ where
     }
 }
 
-impl<T: Float> From<RgbImage> for LabImage<T>
+impl<T: Float> From<RgbImage> for Image<T>
 where
     u8: AsPrimitive<T>,
 {
@@ -60,7 +60,7 @@ where
     }
 }
 
-impl<T: Float> From<RgbaImage> for LabImage<T>
+impl<T: Float> From<RgbaImage> for Image<T>
 where
     u8: AsPrimitive<T>,
 {
@@ -84,7 +84,7 @@ where
     }
 }
 
-impl<T: Float> From<Rgb32FImage> for LabImage<T>
+impl<T: Float> From<Rgb32FImage> for Image<T>
 where
     f32: AsPrimitive<T>,
 {
@@ -108,7 +108,7 @@ where
     }
 }
 
-impl<T: Float> From<Rgba32FImage> for LabImage<T>
+impl<T: Float> From<Rgba32FImage> for Image<T>
 where
     f32: AsPrimitive<T>,
 {
@@ -132,7 +132,7 @@ where
     }
 }
 
-impl<T> LabImage<T> {
+impl<T> Image<T> {
     pub fn pixels(&self) -> &[Lab<T>] {
         &self.pixels
     }
@@ -157,7 +157,7 @@ impl<T> LabImage<T> {
     }
 }
 
-impl<T> Deref for LabImage<T> {
+impl<T> Deref for Image<T> {
     type Target = Grid;
 
     fn deref(&self) -> &Self::Target {

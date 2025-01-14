@@ -1,4 +1,4 @@
-use std::ops::{AddAssign, DivAssign, MulAssign, SubAssign};
+use std::{fmt::Display, ops::{AddAssign, DivAssign, MulAssign, SubAssign}};
 
 use num_traits::{ConstOne, ConstZero};
 
@@ -6,6 +6,9 @@ use crate::{ditherer::DitherWeight, geometry::Point, Lab};
 
 pub trait Float:
     'static
+    + Display
+    + Sync
+    + Send
     + Into<svg::node::Value>
     + image::Primitive
     + AddAssign
@@ -121,7 +124,7 @@ impl Float for f32 {
     const TEAL: Lab<Self> = Lab::new(55.14, -35.5, -25.02);
     const NAVY: Lab<Self> = Lab::new(26.99, 33.99, -68.2);
     const INDIGO: Lab<Self> = Lab::new(32.25, 54.47, -29.97);
-    const VIOLET: Lab<Self> = Lab::new(68.67, 62.28, -64.23);    
+    const VIOLET: Lab<Self> = Lab::new(68.67, 62.28, -64.23);
     const GOLD: Lab<Self> = Lab::new(84.34, 23.83, 77.21);
     const SILVER: Lab<Self> = Lab::new(76.88, -3.19, 1.45);
     const BEIGE: Lab<Self> = Lab::new(94.12, 2.13, 14.19);

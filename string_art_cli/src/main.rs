@@ -1,11 +1,9 @@
-use std::{path::Path, str::FromStr};
+use std::{fs::File, io::Write, path::Path, str::FromStr};
 
 use clap::{Parser, ValueEnum};
 use num_traits::AsPrimitive;
-use palette::{FromColor, Srgb};
 use string_art::{
-    nails::{self, Handle},
-    ColorMapSettings, Darkness, FlatDarkness, Float, Lab, PercentageDarkness, StringArt, Table,
+    nails::{self, Handle}, Algorithm, ColorMapSettings, Darkness, FlatDarkness, Float, Lab, PercentageDarkness, Table
 };
 use thiserror::Error;
 
@@ -20,6 +18,7 @@ struct Args {
     #[arg(short, long, default_value_t = 512)]
     nails: usize,
 
+    //Shape of the nails used.
     #[arg(long, default_value_t = NailKind::Circular)]
     nail_kind: NailKind,
     /// Size in pixels of the longest side of the image.
@@ -42,15 +41,20 @@ struct Args {
     #[arg(long)]
     min_nail_distance: Option<usize>,
 
+    /// Number of threads used on the image.
     #[arg(long, short, default_value_t = 8000)]
     threads: usize,
 
+    /// Interval between partial images are drawn.
     #[arg(long, short)]
     interval: Option<usize>,
 
+    /// Radius of the nails. Only avaiable when --nail_kind circular
     #[arg(long, default_value_t = 1.0)]
     radius: f32,
 
+    /// Colors of the palete. Acepta sintaxis del tipo "white:FFF", "white:FFFFFF",
+    /// "black:0,0,0" y varios colores comunes identificados directamente por su nombre
     #[arg(long, short)]
     colors: Vec<NamedColor>,
 }
@@ -58,31 +62,54 @@ struct Args {
 #[derive(Debug, Clone)]
 struct NamedColor {
     name: String,
-    color: Option<Srgb<u8>>,
-}
-
-struct NamedColorRef<'a> {
-    name: &'a str,
-    color: Option<&'a Srgb<u8>>,
+    color: (u8, u8, u8),
 }
 
 impl FromStr for NamedColor {
     type Err = NamedColorParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // Formato esperado: "name:l,a,b" o "name:#FFFFFF"
         let parts: Vec<&str> = s.split(':').collect();
         match parts.len() {
-            1 => Ok(Self {
-                name: parts[0].to_string(),
-                color: None,
-            }),
+            1 => {
+                let color = match parts[0].to_lowercase().as_str() {
+                    "red" => Ok((255, 0, 0)),
+                    "green" => Ok((0, 255, 0)),
+                    "blue" => Ok((0, 0, 255)),
+                    "yellow" => Ok((255, 255, 0)),
+                    "black" => Ok((0, 0, 0)),
+                    "white" => Ok((255, 255, 255)),
+                    "gray" | "grey" => Ok((128, 128, 128)),
+                    "orange" => Ok((255, 165, 0)),
+                    "purple" => Ok((128, 0, 128)),
+                    "brown" => Ok((165, 42, 42)),
+                    "pink" => Ok((255, 192, 203)),
+                    "cyan" => Ok((0, 255, 255)),
+                    "magenta" => Ok((255, 0, 255)),
+                    "lime" => Ok((50, 205, 50)),
+                    "teal" => Ok((0, 128, 128)),
+                    "navy" => Ok((0, 0, 128)),
+                    "indigo" => Ok((75, 0, 130)),
+                    "violet" => Ok((238, 130, 238)),
+                    "gold" => Ok((255, 215, 0)),
+                    "silver" => Ok((192, 192, 192)),
+                    "beige" => Ok((245, 245, 220)),
+                    "ivory" => Ok((255, 255, 240)),
+                    "peach" => Ok((255, 218, 185)),
+                    "chocolate" => Ok((210, 105, 30)),
+                    _ => Err(NamedColorParseError::InvalidFormat),
+                }?;
+                Ok(Self {
+                    name: parts[0].to_string(),
+                    color,
+                })
+            }
             2 => {
                 let color_str = parts[1];
                 if let Some(color) = parse_hex_color(color_str)? {
                     Ok(NamedColor {
                         name: parts[0].to_string(),
-                        color: Some(color),
+                        color: color,
                     })
                 } else {
                     let rgb: Vec<&str> = color_str.split(',').collect();
@@ -91,7 +118,7 @@ impl FromStr for NamedColor {
                     }
                     Ok(NamedColor {
                         name: parts[0].to_string(),
-                        color: Some(Srgb::<u8>::new(
+                        color: (
                             rgb[0]
                                 .parse::<u8>()
                                 .map_err(|_| NamedColorParseError::InvalidRgb)?,
@@ -101,7 +128,7 @@ impl FromStr for NamedColor {
                             rgb[2]
                                 .parse::<u8>()
                                 .map_err(|_| NamedColorParseError::InvalidRgb)?,
-                        )),
+                        ),
                     })
                 }
             }
@@ -110,7 +137,7 @@ impl FromStr for NamedColor {
     }
 }
 
-fn parse_hex_color(s: &str) -> Result<Option<Srgb<u8>>, NamedColorParseError> {
+fn parse_hex_color(s: &str) -> Result<Option<(u8, u8, u8)>, NamedColorParseError> {
     let s = s.trim();
     let s = s
         .strip_prefix('#')
@@ -125,7 +152,7 @@ fn parse_hex_color(s: &str) -> Result<Option<Srgb<u8>>, NamedColorParseError> {
                 u8::from_str_radix(&s[2..4], 16).map_err(|_| NamedColorParseError::InvalidHex)?;
             let b =
                 u8::from_str_radix(&s[4..6], 16).map_err(|_| NamedColorParseError::InvalidHex)?;
-            Ok(Some(Srgb::new(r, g, b)))
+            Ok(Some((r, g, b)))
         }
         3 => {
             let r = u8::from_str_radix(&s[0..1].repeat(2), 16)
@@ -134,14 +161,14 @@ fn parse_hex_color(s: &str) -> Result<Option<Srgb<u8>>, NamedColorParseError> {
                 .map_err(|_| NamedColorParseError::InvalidHex)?;
             let b = u8::from_str_radix(&s[2..3].repeat(2), 16)
                 .map_err(|_| NamedColorParseError::InvalidHex)?;
-            Ok(Some(Srgb::new(r, g, b)))
+            Ok(Some((r, g, b)))
         }
         _ => Ok(None),
     }
 }
 
 #[derive(Debug, Error)]
-enum NamedColorParseError {
+enum NamedColorParseError {        
     #[error("Formato inválido. Usa 'nombre:color'")]
     InvalidFormat,
     #[error("Formato RGB inválido. Usa valores numéricos separados por comas.")]
@@ -298,105 +325,61 @@ fn with_nail_kind<
     usize: AsPrimitive<S>,
     u8: AsPrimitive<S>,
 {
-    let table = Table::ellipse(
-        image::open(args.input.clone()).unwrap().resize(
-            args.resolution,
-            args.resolution,
-            image::imageops::FilterType::Lanczos3,
-        ),
-        nail_builder,
-        args.nails,
-    );
-    let min_nail_distance = args.min_nail_distance.unwrap_or(args.nails / 10);
-    let mut builder = if args.colors.is_empty() {
-        StringArt::new(
-            table,
-            core::iter::once(ColorMapSettings::new(
-                "Black",
-                Lab::new(S::ZERO, S::ZERO, S::ZERO),
-                0,
-                <N::Handle as Handle>::Link::default(),
-            )),
-            min_nail_distance,
-            darkness,
-        )
-    } else {
-        StringArt::new(
-            table,
-            args.colors.iter().map(|color| {
-                let rgb = color
-                    .color
-                    .unwrap_or_else(|| match color.name.to_lowercase().as_str() {
-                        "red" => Srgb::new(255, 0, 0),
-                        "green" => Srgb::new(0, 255, 0),
-                        "blue" => Srgb::new(0, 0, 255),
-                        "yellow" => Srgb::new(255, 255, 0),
-                        "black" => Srgb::new(0, 0, 0),
-                        "white" => Srgb::new(255, 255, 255),
-                        "gray" | "grey" => Srgb::new(128, 128, 128),
-                        "orange" => Srgb::new(255, 165, 0),
-                        "purple" => Srgb::new(128, 0, 128),
-                        "brown" => Srgb::new(165, 42, 42),
-                        "pink" => Srgb::new(255, 192, 203),
-                        "cyan" => Srgb::new(0, 255, 255),
-                        "magenta" => Srgb::new(255, 0, 255),
-                        "lime" => Srgb::new(50, 205, 50),
-                        "teal" => Srgb::new(0, 128, 128),
-                        "navy" => Srgb::new(0, 0, 128),
-                        "indigo" => Srgb::new(75, 0, 130),
-                        "violet" => Srgb::new(238, 130, 238),
-                        "gold" => Srgb::new(255, 215, 0),
-                        "silver" => Srgb::new(192, 192, 192),
-                        "beige" => Srgb::new(245, 245, 220),
-                        "ivory" => Srgb::new(255, 255, 240),
-                        "peach" => Srgb::new(255, 218, 185),
-                        "chocolate" => Srgb::new(210, 105, 30),
-                        _ => panic!("Color '{}' is not valid", color.name),
-                    });
-                ColorMapSettings::new(
-                    color.name.as_str(),
-                    Lab::from_color(Srgb::new(
-                        rgb.red.as_() * S::TWO_FIVE_FIVE,
-                        rgb.green.as_() * S::TWO_FIVE_FIVE,
-                        rgb.blue.as_() * S::TWO_FIVE_FIVE,
-                    )),
-                    0,
-                    <N::Handle as Handle>::Link::default(),
-                )
-            }),
-            min_nail_distance,
-            darkness,
-        )
-    };
+    todo!()
+    // let table = Table::ellipse(
+    //     image::open(args.input.clone()).unwrap().resize(
+    //         args.resolution,
+    //         args.resolution,
+    //         image::imageops::FilterType::Lanczos3,
+    //     ),
+    //     nail_builder,
+    //     args.nails,
+    // );
+    // let min_nail_distance = args.min_nail_distance.unwrap_or(args.nails / 10);
+    // let mut builder = 
+    //     Algorithm::new(
+    //         table,
+    //         args.colors.iter().map(|color| {
+    //             ColorMapSettings::new(
+    //                 color.name.clone(),
+    //                 color.color,
+    //                 0,
+    //                 <N::Handle as Handle>::Link::default(),
+    //             )
+    //         }),
+    //         min_nail_distance,
+    //         darkness,
+    //         args.threads,
+    //         args.threads
+    //     );
 
-    let path = Path::new(&args.input);
-    let file_name = path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .expect("Invalid file name");
-    let out_folder = Path::new(&args.input)
-        .parent()
-        .unwrap_or(Path::new("."))
-        .join("output");
-    std::fs::create_dir_all(out_folder.as_path()).expect("Output directory can not be created");
+    // let path = Path::new(&args.input);
+    // let file_name = path
+    //     .file_stem()
+    //     .and_then(|s| s.to_str())
+    //     .expect("Invalid file name");
+    // let out_folder = Path::new(&args.input)
+    //     .parent()
+    //     .unwrap_or(Path::new("."))
+    //     .join("output");
+    // std::fs::create_dir_all(out_folder.as_path()).expect("Output directory can not be created");
 
-    if let Some(step) = args.interval {
-        let mut iteration = 1;
-        let mut current = step;
-        while current < args.threads {
-            builder.compute(current);
-            builder
-                .save_image_svg(
-                    out_folder.join(format!("{}_{}.svg", file_name, iteration)),
-                    1.0,
-                )
-                .expect("Failed creating svg image");
-            current += step;
-            iteration += 1;
-        }
-    }
-    builder.compute(args.threads);
-    builder
-        .save_image_svg(out_folder.join(format!("{}.svg", file_name)), 0.5)
-        .expect("Failed creating svg image");
+    // if let Some(step) = args.interval {
+    //     let mut iteration = 1;
+    //     let mut current = step;
+    //     while current < args.threads {
+    //         builder.compute(current);
+    //         File::create(out_folder.join(format!("{}_{}.svg", file_name, iteration)))
+    //             .expect("Failed creating output file")
+    //             .write_all(&builder.build_svg(1.0).to_string().into_bytes())
+    //             .expect("Failed writing output to file");
+    //         current += step;
+    //         iteration += 1;
+    //     }
+    // }
+    // builder.compute(args.threads);
+    // File::create(out_folder.join(format!("{}.svg", file_name)))
+    //     .expect("Failed creating output file")
+    //     .write_all(&builder.build_svg(1.0).to_string().into_bytes())
+    //     .expect("Failed writing output to file");
 }
