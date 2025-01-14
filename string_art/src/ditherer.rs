@@ -1,6 +1,7 @@
 use palette::color_difference::EuclideanDistance;
+use thiserror::Error;
 
-use crate::{colors::LabImage, geometry::Point, Float, Lab};
+use crate::{image::Image, geometry::Point, Float, Lab};
 
 pub struct DitherWeight<T> {
     pub pos: Point<isize>,
@@ -11,7 +12,7 @@ impl<T: Float> DitherWeight<T> {
     fn get_mut<'a>(
         &self,
         pos: Point<usize>,
-        image_dithered: &'a mut LabImage<T>,
+        image_dithered: &'a mut Image<T>,
     ) -> Option<&'a mut Lab<T>> {
         (pos.as_::<isize>() + self.pos)
             .cast::<usize>()
@@ -21,7 +22,7 @@ impl<T: Float> DitherWeight<T> {
             })
     }
 
-    fn apply(&self, pos: Point<usize>, color: Lab<T>, image_dithered: &mut LabImage<T>) {
+    fn apply(&self, pos: Point<usize>, color: Lab<T>, image_dithered: &mut Image<T>) {
         if let Some(pixel) = self.get_mut(pos, image_dithered) {
             pixel.l += color.l * self.weight;
             pixel.a += color.a * self.weight;
@@ -30,10 +31,10 @@ impl<T: Float> DitherWeight<T> {
     }
 }
 
-pub trait WeightedColor<T> {
+pub trait DitherCounter<T> {
     fn color(&self) -> Lab<T>;
 
-    fn add_weight(&mut self);
+    fn add_pixel(&mut self);
 }
 
 pub struct Ditherer<'a, P, W> {
@@ -57,9 +58,9 @@ impl<'a, P, T: Float> Ditherer<'a, P, [DitherWeight<T>; 4]> {
 }
 
 impl<'a, P, W> Ditherer<'a, P, W> {
-    pub fn dither<T: Float>(&mut self, image_dithered: &mut LabImage<T>)
+    pub fn dither<T: Float>(&mut self, image_dithered: &mut Image<T>) -> Result<(), DitherError>
     where
-        P: WeightedColor<T>,
+        P: DitherCounter<T>,
         W: AsRef<[DitherWeight<T>]>,
     {
         let y = image_dithered.height;
@@ -69,7 +70,7 @@ impl<'a, P, W> Ditherer<'a, P, W> {
             for x in 0..x {
                 let old_color = unsafe { image_dithered.get_unchecked_mut(Point { x, y }) };
 
-                let color = self.find_closest_color(old_color);
+                let color = self.find_closest_color(old_color)?;
 
                 let color_diff = Lab::new(
                     old_color.l - color.l,
@@ -83,11 +84,12 @@ impl<'a, P, W> Ditherer<'a, P, W> {
                 }
             }
         }
+        Ok(())
     }
 
-    fn find_closest_color<T: Float>(&mut self, color: &Lab<T>) -> Lab<T>
+    fn find_closest_color<T: Float>(&mut self, color: &Lab<T>) -> Result<Lab<T>, DitherError>
     where
-        P: WeightedColor<T>,
+        P: DitherCounter<T>,
     {
         let mut iter = self.palette.iter_mut();
         if let Some(weighted_color) = iter.next() {
@@ -101,14 +103,17 @@ impl<'a, P, W> Ditherer<'a, P, W> {
                 }
             }
 
-            best.add_weight();
-            best.color()
+            best.add_pixel();
+            Ok(best.color())
         } else{
-            panic!("Palette is empty!")
+            Err(DitherError)
         }
     }
 }
 
+#[derive(Debug, Error)]
+#[error("Palette is empty")]
+pub struct DitherError;
 // impl<T, W> Ditherer<T, W> {
 //     pub fn new(palette: Vec<Lab<T>>, weights: W) -> Self {
 //         Ditherer { palette, weights }

@@ -101,11 +101,15 @@ impl IntoIterator for CircularLinks {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Direction(circle::Direction);
+
+
+
 impl core::fmt::Display for Direction {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self.0 {
-            circle::Direction::ClockWise => write!(f, "ClockWise"),
-            circle::Direction::CounterClockWise => write!(f, "CounterClockWise"),
+            // Since instructions are reversed to the build process, we swap values
+            circle::Direction::ClockWise => write!(f, "CounterClockWise"),
+            circle::Direction::CounterClockWise => write!(f, "ClockWise"),
         }
     }
 }

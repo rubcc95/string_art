@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+string_art = { path = "../string_art" }
 num-traits = { workspace = true }
 palette = { workspace = true }
 image = { workspace = true }
-clap = { version = "4.5.26", features = ["derive"] }
-string_art = { path = "../string_art" }
-thiserror = "2.0.10"
+clap = { version = "4.5.26", features = ["derive"]}
+thiserror = { workspace = true }
