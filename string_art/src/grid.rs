@@ -18,11 +18,11 @@ impl<T> Grid<T> {
 }
 
 impl<T: NumCast + Unsigned + PartialOrd + Copy> Grid<T> {
-    pub fn get_pixel_indexes_in_segment<F: Float>(&self, seg: Segment<F>) -> impl Iterator<Item = T> + '_ {
+    pub fn get_pixel_indexes_in_segment<F: Float>(&self, seg: &Segment<F>) -> impl Iterator<Item = T> + '_ {
         self.get_pixel_coords_in_segment(seg).filter_map(|point| self.index_of(point))
     }
 
-    pub fn get_pixel_coords_in_segment<F: Float>(&self, seg: Segment<F>) -> impl Iterator<Item = Point<T>> + '_ {
+    pub fn get_pixel_coords_in_segment<F: Float>(&self, seg: &Segment<F>) -> impl Iterator<Item = Point<T>> + '_ {
         seg.floor()
             .cast::<isize>()
             .unwrap()

@@ -155,6 +155,10 @@ impl<T> Image<T> {
         self.pixels
             .get_unchecked_mut(self.grid.index_of_unchecked(point))
     }
+
+    pub fn grid(&self) -> &Grid{
+        &self.grid
+    }
 }
 
 impl<T> Deref for Image<T> {

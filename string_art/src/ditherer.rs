@@ -1,7 +1,6 @@
 use palette::color_difference::EuclideanDistance;
-use thiserror::Error;
 
-use crate::{image::Image, geometry::Point, Float, Lab};
+use crate::{geometry::Point, image::Image, verboser::{Message, Verboser}, Float, Lab};
 
 pub struct DitherWeight<T> {
     pub pos: Point<isize>,
@@ -43,8 +42,7 @@ pub struct Ditherer<'a, P, W> {
 }
 
 impl<'a, P, W> Ditherer<'a, P, W> {
-    pub fn new(palette: &'a mut [P], weigths: W) -> Self
-    {
+    pub fn new(palette: &'a mut [P], weigths: W) -> Self {
         Self {
             palette,
             weights: weigths,
@@ -58,7 +56,11 @@ impl<'a, P, T: Float> Ditherer<'a, P, [DitherWeight<T>; 4]> {
 }
 
 impl<'a, P, W> Ditherer<'a, P, W> {
-    pub fn dither<T: Float>(&mut self, image_dithered: &mut Image<T>) -> Result<(), DitherError>
+    pub fn dither<T: Float>(
+        &mut self,
+        image_dithered: &mut Image<T>,
+        verboser: &mut impl Verboser,
+    ) -> Result<(), Error>
     where
         P: DitherCounter<T>,
         W: AsRef<[DitherWeight<T>]>,
@@ -67,6 +69,7 @@ impl<'a, P, W> Ditherer<'a, P, W> {
         let x = image_dithered.width;
 
         for y in 0..y {
+            verboser.verbose(Message::Dithering(y, image_dithered.height));
             for x in 0..x {
                 let old_color = unsafe { image_dithered.get_unchecked_mut(Point { x, y }) };
 
@@ -84,10 +87,11 @@ impl<'a, P, W> Ditherer<'a, P, W> {
                 }
             }
         }
+        verboser.verbose(Message::Dithering(image_dithered.height, image_dithered.height));
         Ok(())
     }
 
-    fn find_closest_color<T: Float>(&mut self, color: &Lab<T>) -> Result<Lab<T>, DitherError>
+    fn find_closest_color<T: Float>(&mut self, color: &Lab<T>) -> Result<Lab<T>, Error>
     where
         P: DitherCounter<T>,
     {
@@ -105,15 +109,15 @@ impl<'a, P, W> Ditherer<'a, P, W> {
 
             best.add_pixel();
             Ok(best.color())
-        } else{
-            Err(DitherError)
+        } else {
+            Err(Error)
         }
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 #[error("Palette is empty")]
-pub struct DitherError;
+pub struct Error;
 // impl<T, W> Ditherer<T, W> {
 //     pub fn new(palette: Vec<Lab<T>>, weights: W) -> Self {
 //         Ditherer { palette, weights }

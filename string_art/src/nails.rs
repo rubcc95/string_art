@@ -23,11 +23,12 @@ pub unsafe trait Links: IntoIterator<Item = Self::Link> {
     const SQ_LEN: usize = Self::LEN * Self::LEN;
 }
 
-pub trait Handle: Copy {
+pub trait Handle: Copy + Send + Sync {
     type Scalar: Float;
-    type Nail: Copy;
+    type Nail: Copy + Send + Sync;
     type Links: Links<Link = Self::Link>;
     type Link: Copy + Into<usize> + Send + Sync;
+    type Error: std::error::Error;
 
     const LINKS: Self::Links;
 
@@ -35,7 +36,7 @@ pub trait Handle: Copy {
         self,
         start: (&Self::Nail, <Self::Links as IntoIterator>::Item),
         end: (&Self::Nail, <Self::Links as IntoIterator>::Item),
-    ) -> Segment<Self::Scalar>;
+    ) -> Result<Segment<Self::Scalar>, Self::Error>;
 
     fn get_next_link(
         self,

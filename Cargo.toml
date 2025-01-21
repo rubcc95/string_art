@@ -2,15 +2,13 @@
 resolver = "2"
 members = [
     "string_art",
-    "string_art_cli",
     "string_art_ui",
 ]
 
 [workspace.dependencies]
 num-traits = "0.2.19"
-palette = "0.7.6"
 image = "0.25.5"
 rayon = "1.10.0"
 thiserror = "2.0.10"
 svg = "0.18.0"
-
+serde = {version = "1.0.217", features = ["derive"] }
