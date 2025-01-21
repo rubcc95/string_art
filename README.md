@@ -4,12 +4,12 @@ Convert images into thread patterns for creating string art. It generates detail
 
 More detailed instructions on how to use the application will be published in future versions.
 
-Compiled versions of the gui app can be found [here](https://drive.google.com/drive/folders/1rw7rob-bZZ0zcl9-m8sMnJFaNBLR5nBS?usp=sharing).
+## Lastest Version Download Links
 
-## Download Links
-
-| Architecture | Installer Link | Portable Version Link |
+| Architecture | Installer | Portable |
 |--------------|----------------|-----------------------|
-| Windows x64  | [Installer](https://drive.usercontent.google.com/download?id=1kSHFIV7Sm8XQ4yhbA0Z-bjpPurRnSz1H&export=download&authuser=0) | [Portable](https://drive.usercontent.google.com/u/0/uc?id=1d34QytSlWVa7zVFsJQCHJuMqSCyMd3XG&export=download) |
+| Windows x64  | [Installer](https://github.com/rubcc95/string_art/releases/download/Windows/string_art_installer.exe) | [Portable](https://github.com/rubcc95/string_art/releases/download/Windows/string_art_portable.exe) |
 | macOS x64    | Not available  | Not available         |
-| Linux x64    | Not available  | [Portable](https://drive.usercontent.google.com/u/0/uc?id=1rc18cbZZKpPxXHQMlRhP45hhLlM0bFhV&export=download) |
+| Linux x64    | Not available  | [Portable](https://github.com/rubcc95/string_art/releases/download/Linux/string_art_portable) |
+
+Other compiled versions of the gui app can be found [here](https://github.com/rubcc95/string_art/releases).
