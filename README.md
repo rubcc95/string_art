@@ -8,8 +8,8 @@ More detailed instructions on how to use the application will be published in fu
 
 | Architecture | Installer | Portable |
 |--------------|----------------|-----------------------|
-| Windows x64  | [Installer](https://github.com/rubcc95/string_art/releases/download/Windows/string_art_installer.exe) | [Portable](https://github.com/rubcc95/string_art/releases/download/Windows/string_art_portable.exe) |
+| Windows x64  | [Download](https://github.com/rubcc95/string_art/releases/download/Windows/string_art_installer.exe) | [Download](https://github.com/rubcc95/string_art/releases/download/Windows/string_art_portable.exe) |
 | macOS x64    | Not available  | Not available         |
-| Linux x64    | Not available  | [Portable](https://github.com/rubcc95/string_art/releases/download/Linux/string_art_portable) |
+| Linux x64    | Not available  | [Download](https://github.com/rubcc95/string_art/releases/download/Linux/string_art_portable) |
 
 Other compiled versions of the gui app can be found [here](https://github.com/rubcc95/string_art/releases).
