@@ -13,4 +13,4 @@ More detailed instructions on how to use the application will be published in fu
 | Linux x64    | Not available  | [Download](https://github.com/rubcc95/string_art/releases/download/Linux/string_art_portable) |
 
 
-Other compiled versions of the gui app can be found [here](https://github.com/rubcc95/string_art/releases).
+Older compiled versions of the gui app can be found [here](https://github.com/rubcc95/string_art/releases).
