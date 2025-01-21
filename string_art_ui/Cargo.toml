@@ -18,7 +18,7 @@ open = "5.3.2"
 rayon = { workspace = true }
 rfd = "0.15.2"
 serde = { workspace = true }
-string_art = { path = "../string_art" }
+string_art = { version = "0.1.0-alpha.1", path = "../string_art" }
 svg = { workspace = true }
 thiserror = { workspace = true }
 
