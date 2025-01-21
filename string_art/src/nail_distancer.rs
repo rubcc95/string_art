@@ -8,16 +8,14 @@ pub struct NailDistancer {
 }
 
 impl NailDistancer {
-    pub fn new(count: usize, distance: usize) -> Result<Self, NailDistanceError> {
+    pub fn new(count: usize, distance: usize) -> Result<Self, Error> {
         if count < 2 * distance {
-            Err(NailDistanceError((1 + count) / 2))
+            Err(Error((1 + count) / 2))
         } else {
             Ok(Self {
                 min: distance,
                 //SAFETY: checked bounds in if
-                max: unsafe {
-                    count.unchecked_sub(distance.unchecked_add(1))
-                },
+                max: unsafe { count.unchecked_sub(distance) },
             })
         }
     }
@@ -41,7 +39,7 @@ impl NailDistancer {
         }
     }
 
-    //SAFETY: caller must ensure that the indices are valid
+    //SAFETY: caller must ensure that the indices are valid via NailDistancer::is_valid
     pub unsafe fn index_of_unchecked<L: nails::Links>(
         &self,
         a_idx: usize,
@@ -54,24 +52,26 @@ impl NailDistancer {
         } else {
             (b_idx, b_link, a_idx, a_link)
         };
-        let first_part = if big_idx > self.max {
-            let diff = big_idx.unchecked_sub(self.max);
-            big_idx = self.max;
+        let cap = self.max.unchecked_sub(1);
+        let first = if big_idx > cap {
+            let diff = big_idx.unchecked_sub(cap);
+            big_idx = cap;
             small_idx = small_idx.unchecked_sub(diff);
-            diff * self.max.unchecked_sub(self.min) * L::SQ_LEN
+            diff.unchecked_mul(cap.unchecked_sub(self.min)).unchecked_mul(L::SQ_LEN)
         } else {
             0
         };
 
-        let diff = big_idx - self.min;
+        let diff = big_idx.unchecked_sub(self.min);
 
-        first_part + diff * diff.unchecked_sub(1) * L::SQ_LEN / 2
-            + L::LEN * diff * big_link.into()
-            + L::LEN * small_idx
-            + small_link.into()
+        first
+            .unchecked_add((diff * diff.unchecked_sub(1) / 2).unchecked_mul(L::SQ_LEN))
+            .unchecked_add(L::LEN.unchecked_mul(diff).unchecked_mul(big_link.into()))
+            .unchecked_add(L::LEN.unchecked_mul(small_idx))
+            .unchecked_add(small_link.into())
     }
 }
 
 #[derive(Debug, Error)]
 #[error("The minimum distance between nails must be smaller than {0}.")]
-pub struct NailDistanceError(usize);
+pub struct Error(usize);

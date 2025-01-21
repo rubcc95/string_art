@@ -41,13 +41,15 @@ impl<T: Float> Handle for Circular<T> {
 
     type Link = Direction;
 
+    type Error = Error;
+
     const LINKS: Self::Links = CircularLinks;
 
     fn get_segment(
         self,
         start: (&Self::Nail, <Self::Links as IntoIterator>::Item),
         end: (&Self::Nail, <Self::Links as IntoIterator>::Item),
-    ) -> Segment<T> {
+    ) -> Result<Segment<T>, Self::Error> {
         Circle {
             center: *start.0,
             radius: self.0,
@@ -59,11 +61,7 @@ impl<T: Float> Handle for Circular<T> {
                 radius: self.0,
             },
             end.1.0,
-        )
-        .expect(
-            "The nails are too close together in this configuration. \
-            Increase the size of your board, or decrease the Nail radius.",
-        )
+        ).ok_or(Error)
     }
 
     fn get_next_link(self, prev_link: Direction) -> Direction {
@@ -138,3 +136,7 @@ impl Distribution<Direction> for Standard{
         Direction(unsafe { core::mem::transmute(rng.gen_range::<u8,_>(0..2)) })
     }
 }
+
+#[derive(Debug, thiserror::Error)]
+#[error("The nails are overlapping")]
+pub struct Error;
