@@ -4,7 +4,7 @@ Convert images into thread patterns for creating string art. It generates detail
 
 More detailed instructions on how to use the application will be published in future versions.
 
-Compiled versions of the gui app can be found here: [Download Link](https://drive.google.com/drive/folders/1rw7rob-bZZ0zcl9-m8sMnJFaNBLR5nBS?usp=sharing)
+Compiled versions of the gui app can be found [here](https://drive.google.com/drive/folders/1rw7rob-bZZ0zcl9-m8sMnJFaNBLR5nBS?usp=sharing).
 
 ## Download Links
 
