@@ -1,8 +1,8 @@
 [package]
 name = "string_art_ui"
-version = "1.0.0-alpha.1"
+version = "0.1.0-alpha.1"
 edition = "2021"
-description = "Convert images into thread patterns for creating string art. It generates detailed instructions in text format and provides graphical previews of the resulting patterns."
+description = "A gui interface for string_art."
 license = "MIT"
 authors = ["Rubén Cantón Casado <rubcc95@gmail.com>"]
 repository = "https://github.com/rubcc95/string_art"

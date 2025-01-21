@@ -3176,7 +3176,7 @@ dependencies = [
 
 [[package]]
 name = "string_art_ui"
-version = "1.0.0-alpha.1"
+version = "0.1.0-alpha.1"
 dependencies = [
  "bincode",
  "eframe",
