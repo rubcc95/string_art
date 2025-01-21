@@ -4,4 +4,3 @@
 
 ### Added
 - Initial release.
-- Basic implementation of resizable arrays for std and no_std environments.
