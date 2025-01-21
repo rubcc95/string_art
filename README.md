@@ -6,10 +6,12 @@ More detailed instructions on how to use the application will be published in fu
 
 ## Lastest Version Download Links
 
+<div align="center">
 | Architecture | Installer | Portable |
 |--------------|----------------|-----------------------|
 | Windows x64  | [Download](https://github.com/rubcc95/string_art/releases/download/Windows/string_art_installer.exe) | [Download](https://github.com/rubcc95/string_art/releases/download/Windows/string_art_portable.exe) |
 | macOS x64    | Not available  | Not available         |
 | Linux x64    | Not available  | [Download](https://github.com/rubcc95/string_art/releases/download/Linux/string_art_portable) |
+</div>
 
 Other compiled versions of the gui app can be found [here](https://github.com/rubcc95/string_art/releases).
