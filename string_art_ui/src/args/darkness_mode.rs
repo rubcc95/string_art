@@ -1,10 +1,16 @@
 use egui::{RichText, WidgetText};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-pub enum DarknessMode {
-    Flat(f32),
-    Percentage(f32),
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct DarknessMode {
+    pub flat: f32,
+    pub percentage: f32,
+    pub mode: DarknessType,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DarknessType{
+    Flat, Percentage,
 }
 
 impl DarknessMode {
@@ -15,39 +21,39 @@ The greater the decay of the algorithm, the more spaced out the lines of the sam
 decay will generate images with a high concentration of a single color in certain regions.\n\nThe algorithm takes a floating-point \
 value as input and returns another floating-point value based on the input. The returned value is expected to be greater than or \
 equal to zero and less than the input value. While an algorithm that does not adhere to this premise will not produce undefined \
-behavior, it will likely result in a completely nonsensical image.\n\nThe input value will be in the range [0, √140050] (the maximum \
-Euclidean distance for a color in Lab format), as long as the previous condition is met.");
+behavior, it will likely result in a completely nonsensical image.\n\nThe input value will be in the range [0, 3] (range for \
+Euclidean distance for a color in normalized RGB format), as long as the previous condition is met.");
             egui::ComboBox::from_id_salt("Darkness Mode")
-                .selected_text(*self)
+                .selected_text(self.mode)
                 .show_ui(ui, |ui| {
                     ui.selectable_value(
-                        self,
-                        DarknessMode::Flat(10.0),
+                        &mut self.mode,
+                        DarknessType::Flat,
                         "Flat",
                     ).on_hover_text("Subtracts the specified value from the input. Return zero if the result is negative.");
                     ui.selectable_value(
-                        self,
-                        DarknessMode::Percentage(0.93),
+                        &mut self.mode,
+                        DarknessType::Percentage,
                         "Percentage",
                     ).on_hover_text("Multiplies the input by the specified value.");
                 });
-            match self {
-                DarknessMode::Flat(flat) => {
-                    ui.add(egui::Slider::new(flat, 0.1..=f32::from_bits(0x43bb1dc4)));
+            match self.mode {
+                DarknessType::Flat => {
+                    ui.add(egui::Slider::new(&mut self.flat, 0.0..=3.0));
                 }
-                DarknessMode::Percentage(per) => {
-                    ui.add(egui::Slider::new(per, 0.0..=1.0));
+                DarknessType::Percentage => {
+                    ui.add(egui::Slider::new(&mut self.percentage, 0.0..=1.0));
                 }
             }
         });
     }
 }
 
-impl From<DarknessMode> for WidgetText {
-    fn from(value: DarknessMode) -> Self {
+impl From<DarknessType> for WidgetText {
+    fn from(value: DarknessType) -> Self {
         WidgetText::RichText(RichText::new(match value {
-            DarknessMode::Flat(_) => "Flat",
-            DarknessMode::Percentage(_) => "Percentage",
+            DarknessType::Flat => "Flat",
+            DarknessType::Percentage => "Percentage",
         }))
     }
 }

@@ -1,16 +1,69 @@
-use crate::{geometry::Point, Float, Grid, Lab};
+use crate::{geometry::Point, Float, Grid, Rgb};
 use image::{DynamicImage, GenericImageView, Rgb32FImage, RgbImage, Rgba32FImage, RgbaImage};
 use num_traits::AsPrimitive;
-use palette::{FromColor, Srgb};
 use std::ops::Deref;
 
-
-
 #[derive(Clone)]
-pub struct Image<T> {
-    pixels: Vec<Lab<T>>,
+pub struct PixelData<T>{
+    pixels: Vec<T>,
     grid: Grid,
 }
+
+impl<T> PixelData<T> {
+    pub unsafe fn from_raw(pixels: Vec<T>, grid: Grid) -> Self{
+        Self { pixels, grid }
+    }
+    
+    pub fn new(mut builder: impl FnMut(Point<usize>) -> T, grid: Grid) -> Self{
+        let mut pixels = Vec::with_capacity(grid.width * grid.height);
+        unsafe {pixels.set_len(pixels.capacity())};
+        let ptr: *mut T = pixels.as_mut_ptr();
+        for x in 0..grid.width{
+            for y in 0..grid.height{
+                let p = Point{x, y};
+                unsafe {core::ptr::write(ptr.add(grid.index_of_unchecked(p)), builder(p))};
+            }
+        }
+        Self{ pixels, grid}
+    }
+    pub fn pixels(&self) -> &[T] {
+        &self.pixels
+    }
+
+    pub fn pixels_mut(&mut self) -> &mut [T]{
+        &mut self.pixels
+    }
+
+    pub fn get(&self, index: impl ImageIndexer) -> Option<&T> {
+        index.get(self)
+    }
+
+    pub fn get_mut(&mut self, index: impl ImageIndexer) -> Option<&mut T> {
+        index.get_mut(self)
+    }
+
+    pub unsafe fn get_unchecked(&self, index: impl ImageIndexer) -> &T {
+        index.get_unchecked(self)
+    }
+
+    pub unsafe fn get_unchecked_mut(&mut self, index: impl ImageIndexer) -> &mut T {
+        index.get_unchecked_mut(self)
+    }
+
+    pub fn grid(&self) -> &Grid{
+        &self.grid
+    }
+}
+
+impl<T> Deref for PixelData<T> {
+    type Target = Grid;
+
+    fn deref(&self) -> &Self::Target {
+        &self.grid
+    }
+}
+
+pub type Image<T> = PixelData<Rgb<T>>;
 
 impl<T: Float> From<DynamicImage> for Image<T>
 where
@@ -21,11 +74,11 @@ where
             pixels: value
                 .pixels()
                 .map(|(_, _, pixel)| {
-                    Lab::from_color(Srgb::new(
+                    Rgb(
                         pixel.0[0].as_() / T::TWO_FIVE_FIVE,
                         pixel.0[1].as_() / T::TWO_FIVE_FIVE,
                         pixel.0[2].as_() / T::TWO_FIVE_FIVE,
-                    ))
+                    )
                 })
                 .collect(),
             grid: Grid {
@@ -45,11 +98,11 @@ where
             pixels: value
                 .pixels()
                 .map(|pixel| {
-                    Lab::from_color(Srgb::new(
+                    Rgb(
                         pixel.0[0].as_(),
                         pixel.0[1].as_(),
                         pixel.0[2].as_(),
-                    ))
+                    )
                 })
                 .collect(),
             grid: Grid {
@@ -69,11 +122,11 @@ where
             pixels: value
                 .pixels()
                 .map(|pixel| {
-                    Lab::from_color(Srgb::new(
+                    Rgb(
                         pixel.0[0].as_(),
                         pixel.0[1].as_(),
                         pixel.0[2].as_(),
-                    ))
+                    )
                 })
                 .collect(),
             grid: Grid {
@@ -93,11 +146,11 @@ where
             pixels: value
                 .pixels()
                 .map(|pixel| {
-                    Lab::from_color(Srgb::new(
+                    Rgb(
                         pixel.0[0].as_(),
                         pixel.0[1].as_(),
                         pixel.0[2].as_(),
-                    ))
+                    )
                 })
                 .collect(),
             grid: Grid {
@@ -117,11 +170,11 @@ where
             pixels: value
                 .pixels()
                 .map(|pixel| {
-                    Lab::from_color(Srgb::new(
+                    Rgb(
                         pixel.0[0].as_(),
                         pixel.0[1].as_(),
                         pixel.0[2].as_(),
-                    ))
+                    )
                 })
                 .collect(),
             grid: Grid {
@@ -132,39 +185,52 @@ where
     }
 }
 
-impl<T> Image<T> {
-    pub fn pixels(&self) -> &[Lab<T>] {
-        &self.pixels
+
+
+
+pub trait ImageIndexer{
+    fn get_mut<T>(self, image: &mut PixelData<T>) -> Option<&mut T>;
+    
+    fn get<T>(self, image: &PixelData<T>) -> Option<&T>;
+
+    unsafe fn get_unchecked_mut<T>(self, image: &mut PixelData<T>) -> &mut T;
+    
+    unsafe fn get_unchecked<T>(self, image: &PixelData<T>) -> &T;
+}
+
+impl ImageIndexer for usize{
+    fn get_mut<T>(self, image: &mut PixelData<T>) -> Option<&mut T> {
+        image.pixels.get_mut(self)
     }
 
-    pub fn get(&self, point: Point<usize>) -> Option<&Lab<T>> {
-        self.index_of(point)
-            .map(|index| unsafe { self.pixels.get_unchecked(index) })
+    fn get<T>(self, image: &PixelData<T>) -> Option<&T> {
+        image.pixels.get(self)
     }
 
-    pub fn get_mut(&mut self, point: Point<usize>) -> Option<&mut Lab<T>> {
-        self.index_of(point)
-            .map(|index| unsafe { self.pixels.get_unchecked_mut(index) })
+    unsafe fn get_unchecked_mut<T>(self, image: &mut PixelData<T>) -> &mut T {
+        image.pixels.get_unchecked_mut(self)
     }
 
-    pub unsafe fn get_unchecked(&self, point: Point<usize>) -> &Lab<T> {
-        self.pixels.get_unchecked(self.index_of_unchecked(point))
-    }
-
-    pub unsafe fn get_unchecked_mut(&mut self, point: Point<usize>) -> &mut Lab<T> {
-        self.pixels
-            .get_unchecked_mut(self.grid.index_of_unchecked(point))
-    }
-
-    pub fn grid(&self) -> &Grid{
-        &self.grid
+    unsafe fn get_unchecked<T>(self, image: &PixelData<T>) -> &T {
+        image.pixels.get_unchecked(self)
     }
 }
 
-impl<T> Deref for Image<T> {
-    type Target = Grid;
+impl ImageIndexer for Point<usize>{
+    fn get_mut<T>(self, image: &mut PixelData<T>) -> Option<&mut T> {
+        image.index_of(self).map(|index| unsafe { image.pixels.get_unchecked_mut(index) })
+    }
 
-    fn deref(&self) -> &Self::Target {
-        &self.grid
+    fn get<T>(self, image: &PixelData<T>) -> Option<&T> {
+        image.index_of(self).map(|index| unsafe{ image.pixels.get_unchecked(index)})
+    }
+
+    unsafe fn get_unchecked_mut<T>(self, image: &mut PixelData<T>) -> &mut T {
+        let index = image.index_of_unchecked(self);
+        image.pixels.get_unchecked_mut(index)
+    }
+
+    unsafe fn get_unchecked<T>(self, image: &PixelData<T>) -> &T {
+        image.pixels.get_unchecked(image.index_of_unchecked(self))
     }
 }

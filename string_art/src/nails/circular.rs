@@ -29,6 +29,10 @@ impl<T: Float> Builder for Circular<T> {
     fn build_handle(self) -> Self::Handle {
         self
     }
+
+    fn offset(&self) -> Self::Scalar {
+        self.0
+    }
     
 }
 
@@ -128,6 +132,12 @@ impl Direction {
 impl From<Direction> for usize {
     fn from(direction: Direction) -> Self {
         direction.0 as usize
+    }
+}
+
+impl From<usize> for Direction {
+    fn from(direction: usize) -> Self {
+        Direction(unsafe { core::mem::transmute(direction as u8) })
     }
 }
 

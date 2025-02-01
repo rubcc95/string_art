@@ -3,17 +3,17 @@ use num_traits::AsPrimitive;
 use serde::{Deserialize, Serialize};
 use string_art::{
     auto_line_config::AutoLineGroupConfig,
-    line_config::{LineGroupConfig, LineItemConfig},
-    line_selector::{self, LineSelector},
+    line_config::{Group, Item},
+    color_handle::{self, Handle},
     verboser::Verboser,
-    AsLab, AutoLineConfig, Float, Image, LineConfig,
+    AutoLineConfig, ColorWeight, Float, Image, Config,
 };
 
 use super::NamedColor;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ArgLineCount {
-    pub manual: string_art::LineConfig,
+    pub manual: string_art::Config,
     pub auto: AutoLineConfig<f32>,
     pub state: ArgLineCountState,
 }
@@ -35,7 +35,7 @@ impl From<&ArgLineCount> for WidgetText {
 
 impl ArgLineCount {
     pub fn new(
-        manual: string_art::LineConfig,
+        manual: string_art::Config,
         auto: AutoLineConfig<f32>,
         state: ArgLineCountState,
     ) -> Self {
@@ -63,15 +63,15 @@ impl ArgLineCount {
         }
     }
 
-    fn manual_form(groups: &mut LineConfig, ui: &mut egui::Ui, palette: &[NamedColor]) {
+    fn manual_form(groups: &mut Config, ui: &mut egui::Ui, palette: &[NamedColor]) {
         ui.horizontal(|ui| {
             ui.add_space(10.0);
             ui.label("Color order:");
             if palette.len() > 0 && ui.button("+").clicked() {
-                groups.push(LineGroupConfig::new(
+                groups.push(Group::new(
                     (0..palette.len())
                         .into_iter()
-                        .map(|idx| LineItemConfig::new(idx, 1000))
+                        .map(|idx| Item::new(idx, 1000))
                         .collect(),
                 ));
             }
@@ -85,7 +85,7 @@ impl ArgLineCount {
                     removed_group = Some(group_idx);
                 }
                 if ui.button("+").clicked() {
-                    group.push(LineItemConfig::new(0, 1000));
+                    group.push(Item::new(0, 1000));
                 }
                 egui::CollapsingHeader::new(format!("Group {}.", group_idx + 1))
                     .default_open(false)
@@ -190,17 +190,17 @@ impl ArgLineCount {
     }
 }
 
-unsafe impl<S: Float> line_selector::Builder<S> for ArgLineCount
+unsafe impl<S: Float> color_handle::Builder<S> for ArgLineCount
 where
     f32: AsPrimitive<S>,
     usize: AsPrimitive<S>,
 {
-    fn build_line_selector(
+    fn build_line_selector<L>(
         &self,
         image: &Image<S>,
-        palette: &[impl AsLab<S>],
+        palette: &[ColorWeight<L, S>],
         verboser: &mut impl Verboser,
-    ) -> Result<LineSelector, line_selector::Error> {
+    ) -> Result<Handle, color_handle::Error> {
         match self.state {
             ArgLineCountState::Manual => self.manual.build_line_selector(image, palette, verboser),
             ArgLineCountState::Auto => self.auto.build_line_selector(image, palette, verboser),

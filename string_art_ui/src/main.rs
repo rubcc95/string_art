@@ -111,26 +111,21 @@ resolution values will require a darkness algorithm with a steeper gradient to m
                         egui::Slider::new(&mut self.args.tickness, 0.1..=2.0)
                             .clamping(egui::SliderClamping::Never),
                     );
-                    if self.args.tickness <= 0.0 {
-                        self.args.tickness = 0.1;
+                    if self.args.tickness < 0.001 {
+                        self.args.tickness = 0.001;
                     }
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Contrast:");
+                    ui.add(
+                        egui::Slider::new(&mut self.args.contrast, 0.0..=1.0)
+                    );
                 });
             });
 
             columns[1].vertical(|ui| {
                 //Nails
-                ui.horizontal(|ui| {
-                    ui.label("Nail Count:").on_hover_text("Number of nails placed around the image.");
-                    ui.add(
-                        egui::Slider::new(
-                            &mut self.args.nails,
-                            unsafe { NonZero::new_unchecked(1) }..=unsafe {
-                                NonZero::new_unchecked(1000)
-                            },
-                        )
-                        .clamping(egui::SliderClamping::Never),
-                    )
-                });
+                self.args.table_shape.form(ui);
                 // Minimum Nail Distance
                 ui.horizontal(|ui| {
                     ui.label("Minimum Nail Distance:").on_hover_text("Number of continuous nails that \
@@ -139,8 +134,21 @@ the edges of the image. Additionally, the algorithm does not consider a nail whe
 starting or ending nail of the line, so avoiding the tracing of edges is usually a good idea.");
                     ui.add(egui::Slider::new(
                         &mut self.args.min_nail_distance,
-                        0..=(self.args.nails.get() / 2).saturating_sub(1),
+                        0..=(match self.args.table_shape.shape{
+                            args::TableShapeMode::Ellipse => self.args.table_shape.ellipse,
+                            args::TableShapeMode::Rectangle => self.args.table_shape.rectangle,
+                        }.get() / 2).saturating_sub(1),
                     ));
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Blur Radius:");
+                    ui.add(
+                        egui::Slider::new(&mut self.args.blur_radius, 0..=10)
+                            .clamping(egui::SliderClamping::Never),
+                    );
+                    if self.args.tickness <= 0.0 {
+                        self.args.tickness = 0.1;
+                    }
                 });
             });
         });
@@ -354,7 +362,9 @@ impl eframe::App for App {
                     self.args_state = ArgsState::Ready;
                 }
             }
-            self.main_menu(ui);
+            egui::ScrollArea::vertical().show(ui, |ui|{ 
+                self.main_menu(ui);
+            })
         });
     }
 

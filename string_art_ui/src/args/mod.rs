@@ -1,4 +1,5 @@
 use crate::synced::{Message, MessageType, SyncedVerboser};
+use darkness_mode::DarknessType;
 use num_traits::AsPrimitive;
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
@@ -6,9 +7,9 @@ use std::num::NonZero;
 use string_art::{
     auto_line_config::{AutoLineConfig, AutoLineGroupConfig},
     darkness::{Darkness, FlatDarkness, PercentageDarkness},
-    line_config::{LineGroupConfig, LineItemConfig},
+    line_config::{Group, Item},
     nails::{self, Circular},
-    AsLab, ColorConfig, Float, Image, Lab, NailTable,
+    AsRgb, ColorConfig, Float, Image, NailTable, Rgb,
 };
 
 use super::synced::Computation;
@@ -17,11 +18,13 @@ mod arg_line_count;
 mod darkness_mode;
 mod nail_shape;
 mod precision;
+mod table_shape;
 
 pub use arg_line_count::{ArgLineCount, ArgLineCountState};
 pub use darkness_mode::DarknessMode;
 pub use nail_shape::NailShape;
 pub use precision::Precision;
+pub use table_shape::{TableShape, TableShapeMode};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Args {
@@ -30,7 +33,8 @@ pub struct Args {
     #[serde(skip_deserializing)]
     pub file_path: Option<String>,
     /// Number of nails surrounding the image.    
-    pub nails: NonZero<usize>,
+    //pub nails: NonZero<usize>,
+    pub table_shape: TableShape,
     pub nail_shape: NailShape,
     /// Size in pixels of the longest side of the image.
     pub resolution: NonZero<u32>,
@@ -38,6 +42,9 @@ pub struct Args {
     pub precision: Precision,
     /// Darkness mode of processing.
     pub darkness_mode: DarknessMode,
+    /// Darkness mode of processing.
+    pub contrast: f32,
+    pub blur_radius: usize,
     /// Minimum nail count between linked nails.
     pub min_nail_distance: usize,
     /// Colors of the palete. Acepta sintaxis del tipo "white:FFF", "white:FFFFFF",
@@ -51,24 +58,34 @@ impl Default for Args {
     fn default() -> Self {
         Self {
             file_path: None,
-            nails: unsafe { NonZero::new_unchecked(512) },
+            table_shape: TableShape {
+                rectangle: unsafe { NonZero::new_unchecked(512) },
+                ellipse: unsafe { NonZero::new_unchecked(512) },
+                shape: TableShapeMode::Ellipse,
+            },
             nail_shape: NailShape::Circular(1.0),
             resolution: unsafe { NonZero::new_unchecked(1000) },
             precision: Precision::Single,
-            darkness_mode: DarknessMode::Percentage(0.93),
+            darkness_mode: DarknessMode {
+                flat: 0.3,
+                percentage: 0.9,
+                mode: DarknessType::Flat,
+            },
+            contrast: 0.5,
+            blur_radius: 4,
             min_nail_distance: 20,
             palette: vec![NamedColor {
                 name: String::from("Black"),
-                color: (0, 0, 0),
+                color: Rgb(0, 0, 0),
             }],
             line_config: ArgLineCount::new(
-                string_art::LineConfig::new(vec![LineGroupConfig::new(vec![LineItemConfig::new(
+                string_art::Config::new(vec![Group::new(vec![Item::new(
                     0, 4000,
                 )])]),
                 AutoLineConfig::new(vec![AutoLineGroupConfig::new(vec![0], 0.5)], 4000),
                 ArgLineCountState::Auto,
             ),
-            tickness: 1.0,
+            tickness: 0.25,
         }
     }
 }
@@ -81,7 +98,7 @@ impl Args {
             if ui.button("+").clicked() {
                 self.palette.push(NamedColor {
                     name: String::from("New Color"),
-                    color: (0, 0, 0),
+                    color: Rgb(0, 0, 0),
                 });
             }
         });
@@ -186,13 +203,15 @@ impl Args {
         usize: AsPrimitive<S>,
         u8: AsPrimitive<S>,
     {
-        match self.darkness_mode {
-            DarknessMode::Flat(flat) => {
-                self.create_algorithm_with_darkness::<S, _>(FlatDarkness(flat.as_()), verboser)
-            }
-            DarknessMode::Percentage(per) => {
-                self.create_algorithm_with_darkness::<S, _>(PercentageDarkness(per.as_()), verboser)
-            }
+        match self.darkness_mode.mode {
+            DarknessType::Flat => self.create_algorithm_with_darkness::<S, _>(
+                FlatDarkness(self.darkness_mode.flat.as_()),
+                verboser,
+            ),
+            DarknessType::Percentage => self.create_algorithm_with_darkness::<S, _>(
+                PercentageDarkness(self.darkness_mode.percentage.as_()),
+                verboser,
+            ),
         }
     }
 
@@ -246,7 +265,21 @@ impl Args {
                         image::imageops::FilterType::Lanczos3,
                     )
                     .into();
-                let table = NailTable::ellipse(*image.grid(), handle, self.nails.get(), verboser);
+                let table = match self.table_shape.shape {
+                    TableShapeMode::Ellipse => NailTable::ellipse(
+                        *image.grid(),
+                        handle,
+                        self.table_shape.ellipse.get(),
+                        verboser,
+                    ),
+                    TableShapeMode::Rectangle => NailTable::square(
+                        *image.grid(),
+                        handle,
+                        self.table_shape.rectangle.get(),
+                        verboser,
+                    )
+                    .map_err(|err| Error::AlgorithmError(Box::new(err)))?,
+                };
                 match string_art::Algorithm::new(
                     table,
                     self.min_nail_distance,
@@ -254,12 +287,16 @@ impl Args {
                     self.palette.iter().map(|color| {
                         ColorConfig::new(
                             color.name.clone(),
-                            color.color.into(),
+                            color.color.as_rgb(),
                             0,
                             Default::default(),
                         )
                     }),
                     darkness,
+
+                    self.contrast.as_(),
+       
+                    self.blur_radius,
                     &self.line_config,
                     verboser,
                 ) {
@@ -275,17 +312,17 @@ impl Args {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NamedColor {
     pub name: String,
-    pub color: (u8, u8, u8),
+    pub color: Rgb,
 }
 
-impl<S: Float> AsLab<S> for NamedColor
-where
-    u8: AsPrimitive<S>,
-{
-    fn as_lab(&self) -> Lab<S> {
-        self.color.as_lab()
-    }
-}
+// impl<S: Float> AsLab<S> for NamedColor
+// where
+//     u8: AsPrimitive<S>,
+// {
+//     fn as_lab(&self) -> Lab<S> {
+//         self.color.as_lab()
+//     }
+// }
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

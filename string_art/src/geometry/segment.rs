@@ -3,7 +3,6 @@ use std::{iter::FusedIterator, ops::{Add, AddAssign, Div, DivAssign, Mul, MulAss
 use super::Point;
 use crate::Float;
 use bresenham::Bresenham;
-use image::GenericImage;
 use num_traits::AsPrimitive;
 use std::fmt;
 
@@ -249,86 +248,89 @@ impl<T> Segment<T> {
 }
 
 impl<T: Float> Segment<T> {
-    pub fn intersection(&self, other: &Segment<T>) -> Option<Point<T>> {
-        let p = self.start;
-        let q = other.start;
-        let r = Point {
-            x: self.end.x - self.start.x,
-            y: self.end.y - self.start.y,
-        };
-        let s = Point {
-            x: other.end.x - other.start.x,
-            y: other.end.y - other.start.y,
-        };
-
-        let rxs = r.x * s.y - r.y * s.x;
-        let qmp = Point {
-            x: q.x - p.x,
-            y: q.y - p.y,
-        };
-        let qpxr = qmp.x * r.y - qmp.y * r.x;
-
-        if rxs.abs() < T::epsilon() {
-            // Los segmentos son colineales o paralelos
-            return None;
-        }
-
-        let t = (qmp.x * s.y - qmp.y * s.x) / rxs;
-        let u = qpxr / rxs;
-
-        if (T::ZERO..=T::ONE).contains(&t) && (T::ZERO..=T::ONE).contains(&u) {
-            Some(Point {
-                x: p.x + t * r.x,
-                y: p.y + t * r.y,
-            })
-        } else {
-            None
-        }
+    pub fn linear_interpolation(&self) -> Option<impl Iterator<Item = Point<isize>>> where usize: AsPrimitive<T>{
+        LinearInterpolator::new(*self)
     }
+    // pub fn intersection(&self, other: &Segment<T>) -> Option<Point<T>> {
+    //     let p = self.start;
+    //     let q = other.start;
+    //     let r = Point {
+    //         x: self.end.x - self.start.x,
+    //         y: self.end.y - self.start.y,
+    //     };
+    //     let s = Point {
+    //         x: other.end.x - other.start.x,
+    //         y: other.end.y - other.start.y,
+    //     };
 
-    pub fn is_m_positive(&self) -> bool {
-        let dx = self.end.x - self.start.x;
-        if dx.abs() < T::EPSILON {
-            return true; // Pendiente infinita
-        }
-        let dy = self.end.y - self.start.y;
+    //     let rxs = r.x * s.y - r.y * s.x;
+    //     let qmp = Point {
+    //         x: q.x - p.x,
+    //         y: q.y - p.y,
+    //     };
+    //     let qpxr = qmp.x * r.y - qmp.y * r.x;
 
-        dy.signum() == dx.signum()
-    }
+    //     if rxs.abs() < T::epsilon() {
+    //         // Los segmentos son colineales o paralelos
+    //         return None;
+    //     }
 
-    pub fn draw<I: GenericImage>(&self, img: &mut I, pixel: I::Pixel) {
-        for point in self.cast().unwrap().points_between() {
-            if point.x >= 0
-                && point.y >= 0
-                && point.x < img.width() as isize
-                && point.y < img.height() as isize
-            {
-                img.put_pixel(point.x as u32, point.y as u32, pixel);
-            }
-        }
-    }
+    //     let t = (qmp.x * s.y - qmp.y * s.x) / rxs;
+    //     let u = qpxr / rxs;
 
-    pub fn parallel_at_distance(&self, distance: T) -> Self {
-        let dx = self.end.x - self.start.x;
-        let dy = self.end.y - self.start.y;
-        let length = num_traits::Float::sqrt(dx * dx + dy * dy);
-        let ux = dx / length;
-        let uy = dy / length;
+    //     if (T::ZERO..=T::ONE).contains(&t) && (T::ZERO..=T::ONE).contains(&u) {
+    //         Some(Point {
+    //             x: p.x + t * r.x,
+    //             y: p.y + t * r.y,
+    //         })
+    //     } else {
+    //         None
+    //     }
+    // }
 
-        let offset_x = -uy * distance;
-        let offset_y = ux * distance;
+    // pub fn is_m_positive(&self) -> bool {
+    //     let dx = self.end.x - self.start.x;
+    //     if dx.abs() < T::EPSILON {
+    //         return true; // Pendiente infinita
+    //     }
+    //     let dy = self.end.y - self.start.y;
 
-        let new_start = Point {
-            x: self.start.x + offset_x,
-            y: self.start.y + offset_y,
-        };
-        let new_end = Point {
-            x: self.end.x + offset_x,
-            y: self.end.y + offset_y,
-        };
+    //     dy.signum() == dx.signum()
+    // }
 
-        Segment::new(new_start, new_end)
-    }
+    // pub fn draw<I: GenericImage>(&self, img: &mut I, pixel: I::Pixel) {
+    //     for point in self.cast().unwrap().points_between() {
+    //         if point.x >= 0
+    //             && point.y >= 0
+    //             && point.x < img.width() as isize
+    //             && point.y < img.height() as isize
+    //         {
+    //             img.put_pixel(point.x as u32, point.y as u32, pixel);
+    //         }
+    //     }
+    // }
+
+    // pub fn parallel_at_distance(&self, distance: T) -> Self {
+    //     let dx = self.end.x - self.start.x;
+    //     let dy = self.end.y - self.start.y;
+    //     let length = num_traits::Float::sqrt(dx * dx + dy * dy);
+    //     let ux = dx / length;
+    //     let uy = dy / length;
+
+    //     let offset_x = -uy * distance;
+    //     let offset_y = ux * distance;
+
+    //     let new_start = Point {
+    //         x: self.start.x + offset_x,
+    //         y: self.start.y + offset_y,
+    //     };
+    //     let new_end = Point {
+    //         x: self.end.x + offset_x,
+    //         y: self.end.y + offset_y,
+    //     };
+
+    //     Segment::new(new_start, new_end)
+    // }
 
     pub fn floor(&self) -> Self {
         Self {
@@ -338,8 +340,45 @@ impl<T: Float> Segment<T> {
     }
 }
 
+struct LinearInterpolator<T>{
+    segment: Segment<T>,
+    curr: usize,
+    len: usize,
+}
+
+impl<T: Float> LinearInterpolator<T>{
+    fn new(segment: Segment<T>) -> Option<Self> {
+        let dx = segment.end.x - segment.start.x;
+        let dy = segment.end.y - segment.start.y;
+        num_traits::Float::sqrt(dx * dx + dy * dy).ceil().to_usize().map(|len|{
+            Self{
+                segment,
+                curr: 0,
+                len,
+            }
+        })        
+    }    
+}
+
+impl<T: Float> Iterator for LinearInterpolator<T> where usize: AsPrimitive<T>{
+    type Item = Point<isize>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.curr < self.len {
+            let a: T = AsPrimitive::<T>::as_(self.curr);
+            let b: T = AsPrimitive::<T>::as_(self.len);
+            let t = a / b;
+            let x = self.segment.start.x + (self.segment.end.x - self.segment.start.x) * t;
+            let y = self.segment.start.y + (self.segment.end.y - self.segment.start.y) * t;
+            self.curr = unsafe { self.curr.unchecked_add(1) };
+            Some(Point{x: x.round().to_isize().unwrap(), y: y.round().to_isize().unwrap()})
+        } else {
+            None
+        }
+    }
+}
 impl Segment<isize> {
-    pub fn points_between(&self) -> impl Iterator<Item = Point<isize>> {
+    pub fn bresenham(&self) -> impl Iterator<Item = Point<isize>> {
         Bresenham::new((self.start.x, self.start.y), (self.end.x, self.end.y))
             .map(|(x, y)| Point { x, y })
     }

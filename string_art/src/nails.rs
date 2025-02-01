@@ -12,8 +12,8 @@ pub trait Builder {
     type Handle: Handle<Scalar = Self::Scalar, Nail = Self::Nail>;
 
     fn build_nail(&self, position: Point<Self::Scalar>, rotation: Self::Scalar) -> Self::Nail;
-
-    fn build_handle(self) -> Self::Handle;
+    fn offset(&self) -> Self::Scalar;
+    fn build_handle(self) -> Self::Handle;    
 }
 
 pub unsafe trait Links: IntoIterator<Item = Self::Link> {
@@ -27,7 +27,7 @@ pub trait Handle: Copy + Send + Sync {
     type Scalar: Float;
     type Nail: Copy + Send + Sync;
     type Links: Links<Link = Self::Link>;
-    type Link: Copy + Into<usize> + Send + Sync;
+    type Link: Copy + Into<usize> + From<usize> + Send + Sync;
     type Error: std::error::Error;
 
     const LINKS: Self::Links;

@@ -4,7 +4,7 @@ use num_traits::AsPrimitive;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ditherer::{DitherCounter, Ditherer}, line_config::LineItemConfig, line_selector::{self, LineSelector}, verboser::Verboser, AsLab, Float, Image, Lab
+    color_map::ColorWeight, line_config::Item, color_handle::{self, Handle}, verboser::Verboser, Float, Image
 };
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -33,66 +33,57 @@ where
     G: AsRef<[AutoLineGroupConfig<S, C>]>,
     C: AsRef<[usize]>,
 {    
-    pub fn bake<T: Float, R: FromIterator<impl FromIterator<I>>, I: From<LineItemConfig>>(
+    pub fn bake<'a, T: Float, R: FromIterator<impl FromIterator<I>>, I: From<Item>, L: 'a>(
         &self,
         image: &Image<T>,
-        palette: &[impl AsLab<T>],
-        verboser: &mut impl Verboser
-    ) -> Result<R, line_selector::Error>
+        weights: impl Iterator<Item = &'a ColorWeight<L, T>>,
+        _: &mut impl Verboser
+    ) -> Result<R, color_handle::Error>
     where
         S: AsPrimitive<T>,
         usize: AsPrimitive<T>,
     {
-        let iter = palette.iter();
-        let mut dither_counters: Vec<AutoLineDitherCounter<T>> = iter
-            .map(|color| AutoLineDitherCounter {
-                lab: color.as_lab(),
+        let mut weights: Vec<AutoLineDitherCounter<'_, L, T>> = weights.map(|counter| {
+            AutoLineDitherCounter {
+                color: counter,
                 weight: T::ZERO,
-                pixel_count: T::ZERO,
-            })
-            .collect();
-        match Ditherer::floyd_steinberg(dither_counters.as_mut_slice()).dither(&mut image.clone(), verboser) {
-            Ok(_) => {
-                for group in self.groups.as_ref() {
-                    let weight = group.weight;
-                    for &index in group.colors.as_ref() {
-                        match dither_counters.get_mut(index) {
-                            Some(counter) => counter.weight += weight.as_(),
-                            None => return Err(line_selector::Error),
-                        }
-                    }
-                }
-                let pixel_count = image.pixels().len().as_();
-                let threads = self.threads.as_();
-
-                Ok(self
-                    .groups
-                    .as_ref()
-                    .iter()
-                    .map(|group| {
-                        group
-                            .colors
-                            .as_ref()
-                            .iter()
-                            .map(|&idx| {
-                                let counter = unsafe { dither_counters.get_unchecked(idx) };
-                                let prop = (group.weight.as_() * counter.pixel_count)
-                                    / (pixel_count * counter.weight);
-                                I::from(LineItemConfig::new(
-                                    idx,
-                                    (threads * prop).to_usize().unwrap(),
-                                ))
-                            })
-                            .collect()
-                    })
-                    .collect())
             }
-            Err(_) => core::iter::empty().collect(),
+        }).collect();
+        for group in self.groups.as_ref() {
+            for &index in group.colors.as_ref() {
+                match weights.get_mut(index) {
+                    Some(weight) => weight.weight += group.weight.as_(),
+                    None => return Err(color_handle::Error),
+                }
+            }
         }
+        let pixel_count = image.pixels().len().as_();
+        let threads = self.threads.as_();
+        Ok(self
+        .groups
+        .as_ref()
+        .iter()
+        .map(|group| {
+            group
+                .colors
+                .as_ref()
+                .iter()
+                .map(|&idx| {
+                    let weight = unsafe { weights.get_unchecked(idx) };
+                    let prop = (group.weight.as_() * weight.color.count.as_())
+                        / (pixel_count * weight.weight);
+                    I::from(Item::new(
+                        idx,
+                        (threads * prop).to_usize().unwrap(),
+                    ))
+                })
+                .collect()
+        })
+        .collect())      
     }
 }
 
-unsafe impl<S, T, G, C> line_selector::Builder<T> for AutoLineConfig<S, G, C>
+unsafe impl<S, T, G, C> color_handle::Builder<T> for AutoLineConfig<S, G, C>
 where
     usize: AsPrimitive<T>,
     S: AsPrimitive<T>,
@@ -100,13 +91,13 @@ where
     G: AsRef<[AutoLineGroupConfig<S, C>]>,
     C: AsRef<[usize]>,
 {
-    fn build_line_selector(
+    fn build_line_selector<L>(
         &self,
         image: &Image<T>,
-        palette: &[impl AsLab<T>],
+        weights: &[ColorWeight<L, T>],
         verboser: &mut impl Verboser
-    ) -> Result<LineSelector, line_selector::Error> {
-        self.bake(image, palette, verboser)
+    ) -> Result<Handle, color_handle::Error> {
+        self.bake(image, weights.iter(), verboser)
     }
 }
 
@@ -150,26 +141,8 @@ impl<S> DerefMut for AutoLineGroupConfig<S> {
     }
 }
 
-struct AutoLineDitherCounter<S> {
-    lab: Lab<S>,
+struct AutoLineDitherCounter<'a, L, S> {
+    color: &'a ColorWeight<L, S>,
     weight: S,
-    pixel_count: S,
+    
 }
-
-impl<S: Float> DitherCounter<S> for AutoLineDitherCounter<S> {
-    fn color(&self) -> Lab<S> {
-        self.lab
-    }
-
-    fn add_pixel(&mut self) {
-        self.pixel_count += S::ONE;
-    }
-}
-
-// #[derive(Debug, thiserror::Error)]
-// pub enum Error {
-//     #[error("Invalid group index")]
-//     InvalidGroupIndex,
-//     #[error(transparent)]
-//     Ditherer(ditherer::Error),
-// }

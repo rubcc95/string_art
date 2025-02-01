@@ -3,30 +3,30 @@ use std::ops::{Deref, DerefMut};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    line_selector::{self, LineItemSelector, LineSelector}, verboser::Verboser, AsLab, Image
+    color_map::ColorWeight, color_handle::{self, Handle}, slice_owner::Slice, verboser::Verboser, Image
 };
     
 #[derive(Clone, Copy, Serialize, Deserialize)]
-pub struct LineItemConfig {
+pub struct Item {
     pub color_idx: usize,
     pub cap: usize,
 }
 
-impl LineItemConfig {
+impl Item {
     pub fn new(color_idx: usize, cap: usize) -> Self {
-        LineItemConfig { color_idx, cap }
+        Item { color_idx, cap }
     }
 }
 
 #[derive(Copy, Clone, Serialize, Deserialize)]
-pub struct LineGroupConfig<C = Vec<LineItemConfig>>(C);
+pub struct Group<C = Vec<Item>>(C);
 
-impl<C> LineGroupConfig<C> {
+impl<C> Group<C> {
     pub fn new(items: C) -> Self {
-        LineGroupConfig(items)
+        Group(items)
     }
 }   
-impl<C> Deref for LineGroupConfig<C>{
+impl<C> Deref for Group<C>{
     type Target = C;
 
     fn deref(&self) -> &Self::Target {
@@ -34,19 +34,19 @@ impl<C> Deref for LineGroupConfig<C>{
     }
 }
 
-impl<C> DerefMut for LineGroupConfig<C>{
+impl<C> DerefMut for Group<C>{
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
 #[derive(Copy, Clone, Serialize, Deserialize)]
-pub struct LineConfig<G = Vec<LineGroupConfig>, C = Vec<LineItemConfig>> {
+pub struct Config<G = Group<Vec<Item>>, C = Vec<Item>> {
     groups: G,
     _panthom: std::marker::PhantomData<C>,
 }
 
-impl<G, C> LineConfig<G, C>{
+impl<G, C> Config<G, C>{
     pub fn new(groups: G) -> Self{
         Self{
             groups,
@@ -55,7 +55,7 @@ impl<G, C> LineConfig<G, C>{
     }
 }
 
-impl<G, C> Deref for LineConfig<G, C>{
+impl<G, C> Deref for Config<G, C>{
     type Target = G;
 
     fn deref(&self) -> &Self::Target {
@@ -63,33 +63,33 @@ impl<G, C> Deref for LineConfig<G, C>{
     }
 }
 
-impl<G, C> DerefMut for LineConfig<G, C>{
+impl<G, C> DerefMut for Config<G, C>{
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.groups
     }
 }
 
-impl From<&LineSelector> for LineConfig{
-    fn from(value: &LineSelector) -> Self {
-        LineConfig::new(value.iter().map(|group| {
-            LineGroupConfig::new(group.iter().map(|item| {
-                LineItemConfig::new(item.color_idx(), item.cap())
+impl<G, C> From<&Handle<> for Config<G, C>{
+    fn from(value: &Selector) -> Self {
+        Config::new(value.iter().map(|group| {
+            Group::new(group.iter().map(|item| {
+                Item::new(item.color_idx(), item.cap())
             }).collect())
         }).collect())   
     }
 }
 
-unsafe impl<S, G, C> line_selector::Builder<S> for LineConfig<G, C>
+unsafe impl<S, G, C> color_handle::Builder<S> for Config<G, C>
 where
-    G: AsRef<[LineGroupConfig<C>]>,
-    C: AsRef<[LineItemConfig]>,
+    G: AsRef<[Group<C>]>,
+    C: AsRef<[Item]>,
 {
-    fn build_line_selector(
+    fn build_line_selector<L, Sl: ?Sized + Slice<Item = ColorWeight<L, S>>>(
         &self,
-        _: &Image<S>,
-        palette: &[impl AsLab<S>],
-        _: &mut impl Verboser,
-    ) -> Result<LineSelector, line_selector::Error> {
+        image: &Image<S>,
+        weights: &Sl,
+        verboser: &mut impl Verboser,
+    ) -> Result<Handle<Sl::Map<color_handle::Group>>, color_handle::Error> {
         self.groups
             .as_ref()
             .iter()
@@ -99,20 +99,19 @@ where
                     .as_ref()
                     .iter()
                     .map(|item| {
-                        if item.color_idx >= palette.len() {
-                            Err(line_selector::Error)
+                        if item.color_idx >= weights.len() {
+                            Err(color_handle::Error)
                         } else {
-                            Ok(LineItemSelector::new(item.color_idx, 0, item.cap))
+                            Ok(color_handle::Item::new(item.color_idx, 0, item.cap))
                         }
                     })
                     .collect()
             })
-            .collect()
     }
 }
 
-impl From<LineItemConfig> for LineItemSelector {
-    fn from(value: LineItemConfig) -> Self {
-        LineItemSelector::new(value.color_idx, 0, value.cap)
+impl From<Item> for Item {
+    fn from(value: Item) -> Self {
+        Item::new(value.color_idx, 0, value.cap)
     }
 }
