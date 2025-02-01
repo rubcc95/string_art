@@ -1,4 +1,4 @@
-use num_traits::{NumCast, Unsigned};
+use num_traits::{AsPrimitive, NumCast, Unsigned};
 
 use crate::{
     geometry::{Point, Segment},
@@ -17,16 +17,36 @@ impl<T> Grid<T> {
     }
 }
 
-impl<T: NumCast + Unsigned + PartialOrd + Copy> Grid<T> {
-    pub fn get_pixel_indexes_in_segment<F: Float>(&self, seg: &Segment<F>) -> impl Iterator<Item = T> + '_ {
+impl<T> From<Point<T>> for Grid<T> {
+    fn from(point: Point<T>) -> Self {
+        Self {
+            height: point.y,
+            width: point.x,
+        }
+    }
+}
+
+impl<T> From<Grid<T>> for Point<T>{
+    fn from(value: Grid<T>) -> Self {
+        Self {
+            x: value.width,
+            y: value.height,
+        }
+    }
+}
+
+impl<T: NumCast + Unsigned + PartialOrd + Copy> Grid<T>  {
+    pub fn get_pixel_indexes_in_segment<F: Float>(&self, seg: &Segment<F>) -> impl Iterator<Item = T> + '_  where usize: AsPrimitive<F> {
         self.get_pixel_coords_in_segment(seg).filter_map(|point| self.index_of(point))
     }
 
-    pub fn get_pixel_coords_in_segment<F: Float>(&self, seg: &Segment<F>) -> impl Iterator<Item = Point<T>> + '_ {
-        seg.floor()
+    pub fn get_pixel_coords_in_segment<F: Float>(&self, seg: &Segment<F>) -> impl Iterator<Item = Point<T>> + '_ where usize: AsPrimitive<F>   {
+        seg
+            .floor()
             .cast::<isize>()
+            //.linear_interpolation()
             .unwrap()
-            .points_between()
+            .bresenham()
             .filter_map(|point| point.cast::<T>())
     }
 

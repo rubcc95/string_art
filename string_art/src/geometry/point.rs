@@ -223,10 +223,6 @@ use num_traits::AsPrimitive;
             num_traits::Float::sqrt(self.sq_distance(other))
         }
 
-        pub fn aprox_eq(&self, other: &Self) -> bool {
-            (self.x - other.x).abs() < T::EPSILON && (self.y - other.y).abs() < T::EPSILON
-        }
-
         pub fn floor(&self) -> Self {
             Self {
                 x: self.x.floor(),

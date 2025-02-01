@@ -43,7 +43,10 @@ impl SyncedVerboser {
                     .sum(),
                 ArgLineCountState::Auto => args.line_config.auto.threads,
             },
-            nails: args.nails.get(),
+            nails: match args.table_shape.shape{
+                crate::args::TableShapeMode::Ellipse => args.table_shape.ellipse.get(),
+                crate::args::TableShapeMode::Rectangle => args.table_shape.rectangle.get(),
+            },
         }
     }
     
@@ -156,7 +159,7 @@ pub trait Computation: Send + Sync {
 
     fn build_instructions(&self) -> String;
 
-    fn get_line_config(&self) -> string_art::LineConfig;
+    fn get_line_config(&self) -> string_art::Config;
 }
 
 impl<N: nails::Handle<Link: ToString>> Computation for Algorithm<N> {
@@ -168,7 +171,7 @@ impl<N: nails::Handle<Link: ToString>> Computation for Algorithm<N> {
         self.build_instructions()
     }
     
-    fn get_line_config(&self) -> string_art::LineConfig {
+    fn get_line_config(&self) -> string_art::Config {
         self.line_selector().into()
     }
 }

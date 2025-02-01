@@ -1,6 +1,4 @@
-use palette::color_difference::EuclideanDistance;
-
-use crate::{geometry::Point, image::Image, verboser::{Message, Verboser}, Float, Lab};
+use crate::{geometry::Point, image::Image, verboser::{Message, Verboser}, ColorWeight, Float, Rgb};
 
 pub struct DitherWeight<T> {
     pub pos: Point<isize>,
@@ -12,7 +10,7 @@ impl<T: Float> DitherWeight<T> {
         &self,
         pos: Point<usize>,
         image_dithered: &'a mut Image<T>,
-    ) -> Option<&'a mut Lab<T>> {
+    ) -> Option<&'a mut Rgb<T>> {
         (pos.as_::<isize>() + self.pos)
             .cast::<usize>()
             .and_then(|point| {
@@ -21,41 +19,87 @@ impl<T: Float> DitherWeight<T> {
             })
     }
 
-    fn apply(&self, pos: Point<usize>, color: Lab<T>, image_dithered: &mut Image<T>) {
+    fn apply(&self, pos: Point<usize>, color: Rgb<T>, image_dithered: &mut Image<T>) {
         if let Some(pixel) = self.get_mut(pos, image_dithered) {
-            pixel.l += color.l * self.weight;
-            pixel.a += color.a * self.weight;
-            pixel.b += color.b * self.weight;
+            pixel.0 += color.0 * self.weight;
+            pixel.1 += color.1 * self.weight;
+            pixel.2  += color.2 * self.weight;
         }
     }
 }
 
-pub trait DitherCounter<T> {
-    fn color(&self) -> Lab<T>;
+pub trait DitherCounter<T>{
+    fn len(&self) -> usize;
 
-    fn add_pixel(&mut self);
+    unsafe fn color(&self, index: usize) -> Rgb<T>;
+
+    unsafe fn add_pixel(&mut self, color_index: usize, pixel_index: usize);
 }
 
-pub struct Ditherer<'a, P, W> {
-    palette: &'a mut [P],
+struct GrayScale<S>(S);
+
+impl<S: Float> GrayScale<S>{
+    const BLACK: Rgb<S> = Rgb(S::ZERO, S::ZERO, S::ZERO);
+    const WHITE: Rgb<S> = Rgb(S::ONE, S::ONE, S::ONE);
+}
+
+impl<L, S: Float> DitherCounter<S> for ColorWeight<L, S>{
+
+    fn len(&self) -> usize {
+        2
+    }
+
+    unsafe fn color(&self, index: usize) -> Rgb<S> {
+        match index {
+            0 => GrayScale::BLACK,
+            1 => GrayScale::WHITE,
+            _ => core::hint::unreachable_unchecked(),
+        }
+    }
+
+    unsafe fn add_pixel(&mut self, color_index: usize, pixel_index: usize) {
+        if color_index == 0{
+            *self.weights.get_unchecked_mut(pixel_index) = S::THREE;
+        }
+    }
+}
+
+impl<L, S: Float> DitherCounter<S> for [ColorWeight<L, S>] {
+    fn len(&self) -> usize{
+        self.len()
+    }
+
+    unsafe fn color(&self, index: usize) -> Rgb<S> {
+        *self.get_unchecked(index).color()
+    }
+
+    unsafe fn add_pixel(&mut self, color_index: usize, pixel_index: usize) {        
+        let color = self.get_unchecked_mut(color_index);
+        *color.weights.get_unchecked_mut(pixel_index) = S::THREE;
+        color.count += 1;
+    }
+}
+
+pub struct Ditherer<'a, P: ?Sized, W> {
+    palette: &'a mut P,
     weights: W,
 }
 
-impl<'a, P, W> Ditherer<'a, P, W> {
-    pub fn new(palette: &'a mut [P], weigths: W) -> Self {
+impl<'a, P: ?Sized, W> Ditherer<'a, P, W> {
+    pub fn new(palette: &'a mut P, weigths: W) -> Self {
         Self {
             palette,
             weights: weigths,
         }
     }
 }
-impl<'a, P, T: Float> Ditherer<'a, P, [DitherWeight<T>; 4]> {
-    pub fn floyd_steinberg(palette: &'a mut [P]) -> Self {
+impl<'a, P: ?Sized, T: Float> Ditherer<'a, P, [DitherWeight<T>; 4]> {
+    pub fn floyd_steinberg(palette: &'a mut P) -> Self {
         Self::new(palette, T::FLOYD_STEINBERG)
     }
 }
 
-impl<'a, P, W> Ditherer<'a, P, W> {
+impl<'a, P: ?Sized, W> Ditherer<'a, P, W> {
     pub fn dither<T: Float>(
         &mut self,
         image_dithered: &mut Image<T>,
@@ -71,17 +115,18 @@ impl<'a, P, W> Ditherer<'a, P, W> {
         for y in 0..y {
             verboser.verbose(Message::Dithering(y, image_dithered.height));
             for x in 0..x {
-                let old_color = unsafe { image_dithered.get_unchecked_mut(Point { x, y }) };
+                let pixel_idx = unsafe { image_dithered.index_of_unchecked(Point { x, y })};
+                let old_color = unsafe { image_dithered.get_unchecked(pixel_idx) };
 
-                let color = self.find_closest_color(old_color)?;
+                let color = self.find_closest_color(old_color, pixel_idx)?;
 
-                let color_diff = Lab::new(
-                    old_color.l - color.l,
-                    old_color.a - color.a,
-                    old_color.b - color.b,
+                let color_diff = Rgb(
+                    old_color.0 - color.0,
+                    old_color.1 - color.1,
+                    old_color.2 - color.2,
                 );
 
-                *old_color = color;
+                //*old_color = color;
                 for dither_weight in self.weights.as_ref() {
                     dither_weight.apply(Point { x, y }, color_diff, image_dithered);
                 }
@@ -91,24 +136,27 @@ impl<'a, P, W> Ditherer<'a, P, W> {
         Ok(())
     }
 
-    fn find_closest_color<T: Float>(&mut self, color: &Lab<T>) -> Result<Lab<T>, Error>
+    fn find_closest_color<T: Float>(&mut self, color: &Rgb<T>, pixel_index: usize) -> Result<Rgb<T>, Error>
     where
         P: DitherCounter<T>,
     {
-        let mut iter = self.palette.iter_mut();
-        if let Some(weighted_color) = iter.next() {
-            let mut min = color.distance_squared(weighted_color.color());
-            let mut best = weighted_color;
-            while let Some(weighted_color) = iter.next() {
-                let distance = color.distance_squared(weighted_color.color());
-                if distance < min {
-                    min = distance;
-                    best = weighted_color
+        let count = self.palette.len();
+        if count > 0 {        
+            let mut best_color = unsafe { self.palette.color(0) };
+            let mut best_dt = color.distance_squared(&best_color);
+            let mut best_idx = 0;
+            for idx in 1..count{
+                let new_color = unsafe { self.palette.color(idx) };
+                let distance = color.distance_squared(&new_color);   
+                if distance < best_dt {
+                    best_dt = distance;
+                    best_idx = idx;
+                    best_color = new_color;
                 }
             }
 
-            best.add_pixel();
-            Ok(best.color())
+            unsafe { self.palette.add_pixel(best_idx, pixel_index) };
+            Ok(best_color)
         } else {
             Err(Error)
         }

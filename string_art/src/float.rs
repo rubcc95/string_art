@@ -19,48 +19,34 @@ pub trait Float:
     + num_traits::NumCast
     + ConstZero
     + ConstOne
-    + palette::num::MulSub
-    + palette::num::PartialCmp
-    + palette::num::Clamp
-    + palette::num::Real
-    + palette::num::Zero
-    + palette::num::One
-    + palette::num::FromScalar<Scalar = Self>
-    + palette::num::Recip
-    + palette::num::IsValidDivisor
-    + palette::bool_mask::HasBoolMask<Mask = bool>
-    + palette::num::Arithmetics
-    + palette::num::Powf
-    + palette::num::Powi
-    + palette::num::Cbrt
-    + palette::num::MulAdd
-    + palette::num::Sqrt
 {
     const HALF: Self;
-    const EPSILON: Self;
     const INFINITY: Self;
+    const EPSILON: Self;
     const TWO: Self;
-    const PI: Self;
-    const SQRT140050: Self; // max euclidean distance for a LAB color
-    const HALF_SQRT140050: Self;
+    const THREE: Self; // max euclidean distance for a LAB color
     const TWO_FIVE_FIVE: Self;
     const FLOYD_STEINBERG: [DitherWeight<Self>; 4];
-    const MINUS_HUNDRED_TWENTY_EIGHT: Self;
-    const HUNDRED_TWENTY_SEVEN: Self;
-    const HUNDRED: Self;
 
     fn min(self, other: Self) -> Self;
+
+    const FRAC_PI_4: Self;
+    const FRAC_PI_2: Self;
+    const FRAC_3PI_4: Self;
+    const PI: Self;
+    const FRAC_5PI_4: Self;
+    const FRAC_3PI_2: Self;
+    const FRAC_7PI_4: Self;    
+    const PI2: Self;
 }
 
 impl Float for f32 {
     const HALF: Self = 0.5;
-    const EPSILON: Self = f32::EPSILON;
     const INFINITY: Self = f32::INFINITY;
+    const EPSILON: Self = f32::EPSILON;
     const TWO: Self = 2.0;
-    const PI: Self = core::f32::consts::PI;
-    const SQRT140050: Self = f32::from_bits(0x43bb1dc4);
+    const THREE: Self = 3.0;//f32::from_bits(0x43bb1dc4);
     const TWO_FIVE_FIVE: Self = 255.0;
-    const HALF_SQRT140050: Self = Self::SQRT140050 * Self::HALF;
     const FLOYD_STEINBERG: [DitherWeight<Self>; 4] = [
         DitherWeight {
             pos: Point { x: 1, y: 0 },
@@ -79,25 +65,29 @@ impl Float for f32 {
             weight: 1.0 / 16.0,
         },
     ];
-    const MINUS_HUNDRED_TWENTY_EIGHT: Self = -128.0;
-    const HUNDRED_TWENTY_SEVEN: Self = 127.0;
-    const HUNDRED: Self = 100.0;
 
     
     fn min(self, other: Self) -> Self{
         self.min(other)
     }
+    
+    const FRAC_PI_4: Self =  core::f32::consts::FRAC_PI_4;
+    const FRAC_PI_2: Self =  core::f32::consts::FRAC_PI_2;
+    const FRAC_3PI_4: Self = 3.0 * core::f32::consts::FRAC_PI_4;
+    const PI: Self = core::f32::consts::PI;
+    const FRAC_5PI_4: Self= 5.0 * core::f32::consts::FRAC_PI_4;
+    const FRAC_3PI_2: Self = 3.0 * core::f32::consts::FRAC_PI_2;
+    const FRAC_7PI_4: Self= 7.0 * core::f32::consts::FRAC_PI_4; 
+    const PI2: Self = 2.0 * core::f32::consts::PI;
 }
 
 impl Float for f64 {
     const HALF: Self = 0.5;
-    const EPSILON: Self = f64::EPSILON;
     const INFINITY: Self = f64::INFINITY;
+    const EPSILON: Self = f64::EPSILON;
     const TWO: Self = 2.0;
-    const PI: Self = core::f64::consts::PI;
-    const SQRT140050: Self = f64::from_bits(0x407763b88446ac1c);
+    const THREE: Self = 3.0;//f64::from_bits(0x407763b88446ac1c);
     const TWO_FIVE_FIVE: Self = 255.0;
-    const HALF_SQRT140050: Self = Self::SQRT140050 * Self::HALF;
     const FLOYD_STEINBERG: [DitherWeight<Self>; 4] = [
         DitherWeight {
             pos: Point { x: 1, y: 0 },
@@ -116,10 +106,18 @@ impl Float for f64 {
             weight: 1.0 / 16.0,
         },
     ];
-    const MINUS_HUNDRED_TWENTY_EIGHT: Self = -128.0;
-    const HUNDRED_TWENTY_SEVEN: Self = 127.0;
-    const HUNDRED: Self = 100.0;
+
+    
     fn min(self, other: Self) -> Self{
         self.min(other)
     }
+
+    const FRAC_PI_4: Self =  core::f64::consts::FRAC_PI_4;
+    const FRAC_PI_2: Self =  core::f64::consts::FRAC_PI_2;
+    const FRAC_3PI_4: Self = 3.0 * core::f64::consts::FRAC_PI_4;
+    const PI: Self = core::f64::consts::PI;
+    const FRAC_5PI_4: Self= 5.0 * core::f64::consts::FRAC_PI_4;
+    const FRAC_3PI_2: Self = 3.0 * core::f64::consts::FRAC_PI_2;
+    const FRAC_7PI_4: Self= 7.0 * core::f64::consts::FRAC_PI_4; 
+    const PI2: Self = 2.0 * core::f64::consts::PI;
 }

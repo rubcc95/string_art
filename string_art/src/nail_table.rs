@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use num_traits::{AsPrimitive, ConstOne, Float as _};
+use num_traits::{AsPrimitive, ConstOne as _, Float as _};
 
 use crate::{
     geometry::{Point, Segment},
@@ -18,6 +18,108 @@ pub struct NailTable<N: nails::Handle> {
 }
 
 impl<N: nails::Handle> NailTable<N> {
+    pub fn square<B: nails::Builder<Scalar: Float, Handle = N, Nail = N::Nail>>(
+        grid: Grid,
+        nail_builder: B,
+        mut nail_count: usize,
+        _: &mut impl verboser::Verboser,
+    ) -> Result<Self, SquareTableError>
+    where
+        usize: AsPrimitive<B::Scalar>,
+    {
+        if nail_count == 0 {
+            return Err(SquareTableError::MinNailCount);
+        }
+        if nail_count % 4 != 0 {
+            return Err(SquareTableError::NotMultipleOf4);
+        }
+        let offset = nail_builder.offset();
+
+        let mut nails = Vec::with_capacity(nail_count);
+        nail_count = unsafe { nail_count.unchecked_sub(4) } / 2;
+
+        let start = Point {
+            x: -offset - B::Scalar::EPSILON,
+            y: -offset - B::Scalar::EPSILON,
+        };
+        let end = Point::from(grid).as_()
+            + Point {
+                x: offset,
+                y: offset,
+            };
+        let size = end - start;
+
+        let x_count = num_traits::ToPrimitive::to_usize(
+            &((((nail_count + 1).as_() * size.x - size.y) / (size.x + size.y)).round()),
+        )
+        .unwrap_or(0)
+            + 2;
+        let y_count = nail_count + 4 - x_count;
+
+        nails.push(nail_builder.build_nail(
+            Point {
+                x: start.x,
+                y: start.y,
+            },
+            B::Scalar::FRAC_5PI_4,
+        ));
+        nails.extend((1..x_count).map(|idx| {
+            nail_builder.build_nail(
+                Point {
+                    x: start.x + size.x * idx.as_() / x_count.as_(),
+                    y: start.y,
+                },
+                B::Scalar::FRAC_3PI_2,
+            )
+        }));
+        nails.push(nail_builder.build_nail(
+            Point {
+                x: end.x,
+                y: start.y,
+            },
+            B::Scalar::FRAC_7PI_4,
+        ));
+        nails.extend((1..y_count).map(|idx| {
+            nail_builder.build_nail(
+                Point {
+                    x: end.x,
+                    y: start.y + size.y * idx.as_() / y_count.as_(),
+                },
+                <B::Scalar as num_traits::ConstZero>::ZERO,
+            )
+        }));
+        nails.push(nail_builder.build_nail(Point { x: end.x, y: end.y }, B::Scalar::FRAC_PI_4));
+        nails.extend((1..x_count).rev().map(|idx| {
+            nail_builder.build_nail(
+                Point {
+                    x: start.x + size.x * idx.as_() / x_count.as_(),
+                    y: end.y,
+                },
+                B::Scalar::FRAC_PI_2,
+            )
+        }));
+        nails.push(nail_builder.build_nail(
+            Point {
+                x: start.x,
+                y: end.y,
+            },
+            B::Scalar::FRAC_3PI_4,
+        ));
+        nails.extend((1..y_count).rev().map(|idx| {
+            nail_builder.build_nail(
+                Point {
+                    x: start.x,
+                    y: start.y + size.y * idx.as_() / y_count.as_(),
+                },
+                B::Scalar::PI,
+            )
+        }));
+        Ok(Self {
+            nails,
+            handle: nail_builder.build_handle(),
+        })
+    }
+
     pub fn ellipse<B: nails::Builder<Scalar: Float, Handle = N, Nail = N::Nail>>(
         grid: Grid,
         nail_builder: B,
@@ -58,6 +160,14 @@ impl<N: nails::Handle> NailTable<N> {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum SquareTableError {
+    #[error("Nail count must be greater or equal to 4")]
+    MinNailCount,
+    #[error("Nail count must be multiple of 4")]
+    NotMultipleOf4,
+}
+
 pub struct BakedNailTable<N: nails::Handle> {
     table: NailTable<N>,
     segments: Vec<BakedSegment<N::Scalar>>,
@@ -65,10 +175,10 @@ pub struct BakedNailTable<N: nails::Handle> {
 }
 
 impl<N: nails::Handle<Error: std::error::Error>> BakedNailTable<N> {
-    pub fn new(table: NailTable<N>, min_nail_distance: usize) -> Result<Self, Error<N::Error>> {
+    pub fn new(table: NailTable<N>, min_nail_distance: usize) -> Result<Self, BakeError<N::Error>> {
         let nail_count = table.nails.len();
         let distancer =
-            NailDistancer::new(nail_count, min_nail_distance).map_err(Error::Distancer)?;
+            NailDistancer::new(nail_count, min_nail_distance).map_err(BakeError::Distancer)?;
         let nails = &table.nails;
 
         Ok(Self {
@@ -82,7 +192,6 @@ impl<N: nails::Handle<Error: std::error::Error>> BakedNailTable<N> {
                                 .filter_map(move |small_idx| {
                                     if distancer.is_valid(big_idx, small_idx) {
                                         Some(N::LINKS.into_iter().map(move |small_link| {
-                                            //((big_idx, big_link), (small_idx, small_link))
                                             Ok(BakedSegment {
                                                 segment: table.handle.get_segment(
                                                     (
@@ -107,7 +216,7 @@ impl<N: nails::Handle<Error: std::error::Error>> BakedNailTable<N> {
                 })
                 .flatten()
                 .collect::<Result<_, _>>()
-                .map_err(Error::Nail)?,
+                .map_err(BakeError::Nail)?,
             table,
             distancer,
         })
@@ -159,7 +268,7 @@ impl<S> Deref for BakedSegment<S> {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum Error<N> {
+pub enum BakeError<N> {
     #[error(transparent)]
     Nail(N),
     #[error(transparent)]
