@@ -172,59 +172,73 @@ pub struct BakedNailTable<N: nails::Handle> {
     table: NailTable<N>,
     segments: Vec<BakedSegment<N::Scalar>>,
     distancer: NailDistancer,
+    buffer: Vec<usize>,
 }
 
-impl<N: nails::Handle> From<BakedNailTable<N>> for NailTable<N>{
+impl<N: nails::Handle> From<BakedNailTable<N>> for NailTable<N> {
     fn from(value: BakedNailTable<N>) -> Self {
         value.table
     }
 }
 
-impl<N: nails::Handle<Error: std::error::Error>> BakedNailTable<N> {
-    pub fn new(table: NailTable<N>, min_nail_distance: usize) -> Result<Self, Error<N::Error>> {
+impl<N: nails::Handle<Error: std::error::Error>> BakedNailTable<N>
+where
+    usize: AsPrimitive<N::Scalar>,
+{
+    pub fn new(
+        table: NailTable<N>,
+        min_nail_distance: usize,
+        grid: &Grid,
+    ) -> Result<Self, Error<N::Error>> {
         let nail_count = table.nails.len();
         let distancer =
             NailDistancer::new(nail_count, min_nail_distance).map_err(Error::Distancer)?;
         let nails = &table.nails;
 
+        let cap = table.nails.len() - 2 * min_nail_distance;
+        let mut buffer = Vec::new();
+        //let mut buffer = Vec::<usize>::new();
+
+        let mut segments = Vec::new();
+        for big_idx in 0..nail_count {
+            for big_link in N::LINKS {
+                for small_idx in 0..big_idx {
+                    if distancer.is_valid(big_idx, small_idx) {
+                        for small_link in N::LINKS {
+                            let segment = table
+                                .handle
+                                .get_segment(
+                                    (unsafe { nails.get_unchecked(big_idx) }, big_link),
+                                    (unsafe { nails.get_unchecked(small_idx) }, small_link),
+                                )
+                                .map_err(Error::Nail)?;
+                            let start = buffer.len();
+                            buffer.extend(grid.get_pixel_indexes_in_segment(&segment));
+                            let len = buffer.len() - start;
+                            segments.push(BakingSegment {
+                                segment,
+                                start,
+                                len,
+                            });
+                        }
+                    }
+                }
+            }
+        }
         Ok(Self {
-            segments: (0..nail_count)
-                .into_iter()
-                .map(move |big_idx| {
-                    N::LINKS
-                        .into_iter()
-                        .map(move |big_link| {
-                            (0..big_idx)
-                                .filter_map(move |small_idx| {
-                                    if distancer.is_valid(big_idx, small_idx) {
-                                        Some(N::LINKS.into_iter().map(move |small_link| {
-                                            Ok(BakedSegment {
-                                                segment: table.handle.get_segment(
-                                                    (
-                                                        unsafe { nails.get_unchecked(big_idx) },
-                                                        big_link,
-                                                    ),
-                                                    (
-                                                        unsafe { nails.get_unchecked(small_idx) },
-                                                        small_link,
-                                                    ),
-                                                )?,
-                                                used: false,
-                                            })
-                                        }))
-                                    } else {
-                                        None
-                                    }
-                                })
-                                .flatten()
-                        })
-                        .flatten()
-                })
-                .flatten()
-                .collect::<Result<_, _>>()
-                .map_err(Error::Nail)?,
             table,
+            segments: segments
+                .into_iter()
+                .map(|segment| BakedSegment {
+                    segment: segment.segment,
+                    used: false,
+                    buff: unsafe {
+                        core::slice::from_raw_parts(buffer.as_ptr().add(segment.start), segment.len)
+                    },
+                })
+                .collect(),
             distancer,
+            buffer,
         })
     }
 
@@ -244,12 +258,22 @@ impl<N: nails::Handle> Deref for BakedNailTable<N> {
         &self.table
     }
 }
+pub struct BakingSegment<S> {
+    segment: Segment<S>,
+    start: usize,
+    len: usize,
+}
 
 #[derive(Clone, Copy)]
 pub struct BakedSegment<S> {
     segment: Segment<S>,
     used: bool,
+    buff: *const [usize],
 }
+
+unsafe impl<S> Send for BakedSegment<S> {}
+
+unsafe impl<S> Sync for BakedSegment<S> {}
 
 impl<S> BakedSegment<S> {
     pub fn segment(&self) -> &Segment<S> {
@@ -262,6 +286,10 @@ impl<S> BakedSegment<S> {
 
     pub fn is_used(&self) -> bool {
         self.used
+    }
+
+    pub unsafe fn get_pixel_indexes(&self) -> &[usize] {
+        &*self.buff
     }
 }
 

@@ -1,26 +1,33 @@
-use crate::synced::{Message, MessageType, SyncedVerboser};
+use crate::synced::{Message, MessageType, SyncedBuilder, SyncedConfig, SyncedVerboser};
 use darkness_mode::DarknessType;
 use num_traits::AsPrimitive;
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
-use std::num::NonZero;
+use std::{
+    num::NonZero,
+    ops::{Deref, DerefMut},
+};
 use string_art::{
-    auto_line_config::{AutoLineConfig, AutoLineGroupConfig},
+    color::{
+        self,
+        config::{multi as config, Handle},
+        Config, Rgb,
+    },
     darkness::{Darkness, FlatDarkness, PercentageDarkness},
-    line_config::{Group, Item},
-    nails::{self, Circular},
-    AsRgb, ColorConfig, Float, Image, NailTable, Rgb,
+    nails::{Builder, Circular, Handle as NHandle},
+    slice::SliceOwner,
+    Float, Image, NailTable,
 };
 
 use super::synced::Computation;
 
-mod arg_line_count;
+mod line_config;
 mod darkness_mode;
 mod nail_shape;
 mod precision;
 mod table_shape;
 
-pub use arg_line_count::{ArgLineCount, ArgLineCountState};
+pub use line_config::{LineConfig, LineConfigState};
 pub use darkness_mode::DarknessMode;
 pub use nail_shape::NailShape;
 pub use precision::Precision;
@@ -28,6 +35,138 @@ pub use table_shape::{TableShape, TableShapeMode};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Args {
+    inner: ArgsP,
+    pub precision: Precision,
+}
+
+impl Default for Args {
+    fn default() -> Self {
+        Self {
+            inner: Default::default(),
+            precision: Precision::Single,
+        }
+    }
+}
+
+impl Deref for Args {
+    type Target = ArgsP;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for Args {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ArgsP {
+    inner: ArgsD,
+    /// Darkness mode of processing.
+    pub darkness_mode: DarknessMode,
+}
+
+impl Default for ArgsP {
+    fn default() -> Self {
+        Self {
+            inner: Default::default(),
+            darkness_mode: DarknessMode {
+                flat: 0.3,
+                percentage: 0.9,
+                mode: DarknessType::Flat,
+            },
+        }
+    }
+}
+
+impl Deref for ArgsP {
+    type Target = ArgsD;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for ArgsP {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ArgsD {
+    inner: ArgsN,
+    pub nail_shape: NailShape,
+}
+
+impl Default for ArgsD {
+    fn default() -> Self {
+        Self {
+            inner: Default::default(),
+            nail_shape: NailShape::Circular(1.0),
+        }
+    }
+}
+
+impl Deref for ArgsD {
+    type Target = ArgsN;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for ArgsD {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ArgsN {
+    inner: ArgsF,
+    /// Colors of the palete. Acepta sintaxis del tipo "white:FFF", "white:FFFFFF",
+    /// "black:0,0,0" y varios colores comunes identificados directamente por su nombre
+    pub palette: Vec<color::Named>,
+    pub line_config: LineConfig,
+}
+
+impl Default for ArgsN {
+    fn default() -> Self {
+        Self {
+            inner: Default::default(),
+            palette: vec![color::Named::new(String::from("Black"), Rgb(0, 0, 0))],
+            line_config: LineConfig::new(
+                config::Manual::new(vec![config::manual::Group::new(vec![
+                    config::manual::Item::new(0, 12000),
+                ])]),
+                config::Auto::new(vec![config::auto::Group::new(vec![0], 0.5)], 12000),
+                4000,
+                LineConfigState::Auto,
+            ),
+        }
+    }
+}
+
+impl Deref for ArgsN {
+    type Target = ArgsF;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for ArgsN {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ArgsF {
     /// Input file path.
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
@@ -35,26 +174,17 @@ pub struct Args {
     /// Number of nails surrounding the image.    
     //pub nails: NonZero<usize>,
     pub table_shape: TableShape,
-    pub nail_shape: NailShape,
     /// Size in pixels of the longest side of the image.
     pub resolution: NonZero<u32>,
-    /// Precision of calculations (Single/Double).
-    pub precision: Precision,
-    /// Darkness mode of processing.
-    pub darkness_mode: DarknessMode,
     /// Darkness mode of processing.
     pub contrast: f32,
     pub blur_radius: usize,
     /// Minimum nail count between linked nails.
     pub min_nail_distance: usize,
-    /// Colors of the palete. Acepta sintaxis del tipo "white:FFF", "white:FFFFFF",
-    /// "black:0,0,0" y varios colores comunes identificados directamente por su nombre
-    pub palette: Vec<NamedColor>,
     pub tickness: f32,
-    pub line_config: ArgLineCount,
 }
 
-impl Default for Args {
+impl Default for ArgsF {
     fn default() -> Self {
         Self {
             file_path: None,
@@ -63,28 +193,10 @@ impl Default for Args {
                 ellipse: unsafe { NonZero::new_unchecked(512) },
                 shape: TableShapeMode::Ellipse,
             },
-            nail_shape: NailShape::Circular(1.0),
             resolution: unsafe { NonZero::new_unchecked(1000) },
-            precision: Precision::Single,
-            darkness_mode: DarknessMode {
-                flat: 0.3,
-                percentage: 0.9,
-                mode: DarknessType::Flat,
-            },
             contrast: 0.5,
             blur_radius: 4,
             min_nail_distance: 20,
-            palette: vec![NamedColor {
-                name: String::from("Black"),
-                color: Rgb(0, 0, 0),
-            }],
-            line_config: ArgLineCount::new(
-                string_art::Config::new(vec![Group::new(vec![Item::new(
-                    0, 4000,
-                )])]),
-                AutoLineConfig::new(vec![AutoLineGroupConfig::new(vec![0], 0.5)], 4000),
-                ArgLineCountState::Auto,
-            ),
             tickness: 0.25,
         }
     }
@@ -96,20 +208,19 @@ impl Args {
             ui.label("Palette")
                 .on_hover_text("Colors used for the threads in the image.");
             if ui.button("+").clicked() {
-                self.palette.push(NamedColor {
-                    name: String::from("New Color"),
-                    color: Rgb(0, 0, 0),
-                });
+                self.palette
+                    .push(color::Named::new(String::from("New Color"), Rgb(0, 0, 0)));
             }
         });
         let mut removed = None;
+        let palette_len = self.palette.len();
         for (idx, color) in self.palette.iter_mut().enumerate() {
             ui.horizontal(|ui| {
                 ui.text_edit_singleline(&mut color.name);
-                let mut arr_col = color.color.into();
+                let mut arr_col = color.value.into();
                 ui.color_edit_button_srgb(&mut arr_col);
-                color.color = arr_col.into();
-                if ui.button("-").clicked() {
+                color.value = arr_col.into();
+                if palette_len > 1 && ui.button("🗑").clicked() {
                     removed = Some(idx);
                 }
             });
@@ -184,39 +295,35 @@ impl Args {
         self.palette.remove(index);
     }
 
-    pub fn create_algorithm(
-        &self,
-        verboser: &mut SyncedVerboser,
-    ) -> Result<Box<dyn Computation>, Error> {
+    pub fn compute(self, verboser: &mut SyncedVerboser) -> Result<Box<dyn Computation>, Error> {
         match self.precision {
-            Precision::Single => self.create_algorithm_with_scalar::<f32>(verboser),
-            Precision::Double => self.create_algorithm_with_scalar::<f64>(verboser),
+            Precision::Single => self.inner.compute::<f32>(verboser),
+            Precision::Double => self.inner.compute::<f64>(verboser),
         }
     }
-
-    fn create_algorithm_with_scalar<S: Float>(
-        &self,
-        verboser: &mut SyncedVerboser,
-    ) -> Result<Box<dyn Computation>, Error>
+}
+impl ArgsP {
+    fn compute<S: Float>(self, verboser: &mut SyncedVerboser) -> Result<Box<dyn Computation>, Error>
     where
         f32: AsPrimitive<S>,
         usize: AsPrimitive<S>,
         u8: AsPrimitive<S>,
     {
         match self.darkness_mode.mode {
-            DarknessType::Flat => self.create_algorithm_with_darkness::<S, _>(
-                FlatDarkness(self.darkness_mode.flat.as_()),
-                verboser,
-            ),
-            DarknessType::Percentage => self.create_algorithm_with_darkness::<S, _>(
+            DarknessType::Flat => self
+                .inner
+                .compute::<S, _>(FlatDarkness(self.darkness_mode.flat.as_()), verboser),
+            DarknessType::Percentage => self.inner.compute::<S, _>(
                 PercentageDarkness(self.darkness_mode.percentage.as_()),
                 verboser,
             ),
         }
     }
+}
 
-    fn create_algorithm_with_darkness<S, D>(
-        &self,
+impl ArgsD {
+    fn compute<S, D>(
+        self,
         darkness: D,
         verboser: &mut SyncedVerboser,
     ) -> Result<Box<dyn Computation>, Error>
@@ -229,14 +336,17 @@ impl Args {
     {
         match self.nail_shape {
             NailShape::Circular(radius) => {
-                self.create_algorithm_with_nails(darkness, Circular::new(radius.as_()), verboser)
+                self.inner
+                    .compute(darkness, Circular::new(radius.as_()), verboser)
             }
-            NailShape::Point => Err(Error::UnimplementedFeature("Point nail kind")),
+            NailShape::Point => Err(Error::UnimplementedFeature("Point nail")),
         }
     }
+}
 
-    fn create_algorithm_with_nails<D, N>(
-        &self,
+impl ArgsN {
+    fn compute<D, N>(
+        self,
         darkness: D,
         handle: N,
         verboser: &mut SyncedVerboser,
@@ -246,19 +356,59 @@ impl Args {
         u8: AsPrimitive<N::Scalar>,
         f32: AsPrimitive<N::Scalar>,
         D: Darkness<N::Scalar> + Send + Sync + 'static,
-        N: nails::Builder<
-            Scalar: Float,
-            Handle: nails::Handle<Nail: Send + Sync, Link: Default + Send + Sync + ToString>
-                        + Send
-                        + Sync
-                        + 'static,
-        >,
+        N: SyncedBuilder,
+    {
+        let palette: Vec<_> = self
+            .palette
+            .iter()
+            .map(|color| {
+                string_art::color::mapping::State::new(color.clone(), 0, Default::default())
+            })
+            .collect();
+
+        match &self.line_config.state {
+            LineConfigState::Manual => self.inner.compute(
+                darkness,
+                handle,
+                verboser,
+                config::Config::new(palette, self.line_config.manual),
+            ),
+            LineConfigState::Auto => self.inner.compute(
+                darkness,
+                handle,
+                verboser,
+                config::Config::new(palette, self.line_config.auto),
+            ),
+        }
+    }
+
+    pub fn line_form(&mut self, ui: &mut egui::Ui) {
+        self.line_config.form(ui, &self.palette);
+    }
+}
+
+impl ArgsF {
+    fn compute<D, N, C>(
+        self,
+        darkness: D,
+        handle: N,
+        verboser: &mut SyncedVerboser,
+        config: C,
+    ) -> Result<Box<dyn Computation>, Error>
+    where
+        usize: AsPrimitive<N::Scalar>,
+        u8: AsPrimitive<N::Scalar>,
+        f32: AsPrimitive<N::Scalar>,
+        D: Darkness<N::Scalar> + Send + Sync + 'static,
+        N: SyncedBuilder,
+        C: SyncedConfig<<N::Handle as NHandle>::Link, N::Scalar>,
     {
         match &self.file_path {
             Some(file_path) => {
                 verboser.verbose(Message::new(MessageType::LoadingImage, "Loading image..."));
+
                 let image: Image<N::Scalar> = image::open(file_path)
-                    .map_err(|err| Error::ImageError(err))?
+                    .map_err(|err| Error::Image(err))?
                     .resize(
                         self.resolution.get(),
                         self.resolution.get(),
@@ -278,30 +428,38 @@ impl Args {
                         self.table_shape.rectangle.get(),
                         verboser,
                     )
-                    .map_err(|err| Error::AlgorithmError(Box::new(err)))?,
+                    .map_err(|err| Error::Computation(Box::new(err)))?,
                 };
-                match string_art::Algorithm::new(
+
+                //let a= string_art::color::Config::into_color_handle(config, &image, 100, self.blur_radius, self.contrast.as_()).unwrap();
+                let a = string_art::compute(
                     table,
                     self.min_nail_distance,
                     &image,
-                    self.palette.iter().map(|color| {
-                        ColorConfig::new(
-                            color.name.clone(),
-                            color.color.as_rgb(),
-                            0,
-                            Default::default(),
-                        )
-                    }),
+                    config,
                     darkness,
-
                     self.contrast.as_(),
-       
                     self.blur_radius,
-                    &self.line_config,
                     verboser,
-                ) {
-                    Ok(algorithm) => Ok(Box::new(algorithm)),
-                    Err(err) => Err(Error::AlgorithmError(Box::new(err))),
+                );
+
+                match a {
+                    Ok(computation) => {
+                        let cmp: string_art::Computation<
+                            <<<C as Config<
+                                '_,
+                                <<N as Builder>::Handle as NHandle>::Link,
+                                <N as Builder>::Scalar,
+                            >>::Handle as Handle<
+                                '_,
+                                <<N as Builder>::Handle as NHandle>::Link,
+                                <N as Builder>::Scalar,
+                            >>::Owner as SliceOwner<'_>>::Map<'_, color::Named>,
+                            <N as Builder>::Handle,
+                        > = computation;
+                        Ok(Box::new(cmp))
+                    }
+                    Err(err) => Err(Error::Computation(Box::new(err))),
                 }
             }
             None => Err(Error::MissingFilePath),
@@ -309,32 +467,17 @@ impl Args {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NamedColor {
-    pub name: String,
-    pub color: Rgb,
-}
-
-// impl<S: Float> AsLab<S> for NamedColor
-// where
-//     u8: AsPrimitive<S>,
-// {
-//     fn as_lab(&self) -> Lab<S> {
-//         self.color.as_lab()
-//     }
-// }
-
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("Missing file path.")]
     MissingFilePath,
 
     #[error(transparent)]
-    AlgorithmError(Box<dyn std::error::Error>),
+    Computation(Box<dyn std::error::Error>),
 
     #[error("Unimplemented feature: {0}.")]
     UnimplementedFeature(&'static str),
 
     #[error(transparent)]
-    ImageError(image::ImageError),
+    Image(image::ImageError),
 }

@@ -18,6 +18,12 @@ pub enum TableShapeMode{
 
 
 impl TableShape {
+pub fn value(&self) -> usize{
+    match self.shape {
+        TableShapeMode::Ellipse => self.ellipse,
+        TableShapeMode::Rectangle => self.rectangle,
+    }.get()
+}
 pub fn form(&mut self, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         ui.label("Output shape:").on_hover_text("Shape of the output string art.");
@@ -53,7 +59,7 @@ pub fn form(&mut self, ui: &mut egui::Ui) {
                 ui.add(
                     egui::Slider::new(
                         &mut self.rectangle,
-                        unsafe { NonZero::new_unchecked(1) }..=unsafe {
+                        unsafe { NonZero::new_unchecked(4) }..=unsafe {
                             NonZero::new_unchecked(1000)
                         },
                     )

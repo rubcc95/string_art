@@ -2,12 +2,15 @@ use std::{ops::Deref, sync::Arc};
 
 use egui::mutex::Mutex;
 use string_art::{
-    nails,
+    color, nails, slice,
     verboser::{self, Verboser},
-    Algorithm,
+    Computation as Cmp,
 };
 
-use crate::{args::{ArgLineCountState, Args}, SyncArgs};
+use crate::{
+    args::{LineConfigState, Args},
+    SyncArgs,
+};
 
 #[derive(Default)]
 pub struct Synced<T>(Arc<Mutex<T>>);
@@ -26,6 +29,59 @@ impl<T> Deref for Synced<T> {
     }
 }
 
+pub trait SyncedBuilder:
+    nails::Builder<
+    Handle: nails::Handle<Nail: Send + Sync, Link: Default + Send + Sync + ToString>
+                + Send
+                + Sync
+                + 'static,
+>
+{
+}
+
+impl<
+        T: nails::Builder<
+            Handle: nails::Handle<Nail: Send + Sync, Link: Default + Send + Sync + ToString>
+                        + Send
+                        + Sync
+                        + 'static,
+        >,
+    > SyncedBuilder for T
+{
+}
+
+pub trait SyncedConfig<L: 'static, S: 'static>:
+    'static
+    + color::Config<
+        'static,
+        L,
+        S,
+        Handle: color::config::Handle<
+            'static,
+            L,
+            S,
+            Owner: slice::SliceOwner<'static, Map<'static, color::Named>: Send + Sync>,
+        >,
+    >
+{
+}
+
+impl<T, L: 'static, S: 'static> SyncedConfig<L, S> for T where
+    T: 'static
+        + color::Config<
+            'static,
+            L,
+            S,
+            Handle: color::config::Handle<
+                'static,
+                L,
+                S,
+                Owner: slice::SliceOwner<'static, Map<'static, color::Named>: Send + Sync>,
+            >,
+        >
+{
+}
+
 pub struct SyncedVerboser {
     synced: Synced<SyncData>,
     threads: usize,
@@ -37,19 +93,21 @@ impl SyncedVerboser {
         Self {
             synced,
             threads: match args.line_config.state {
-                ArgLineCountState::Manual => args.line_config.manual
+                LineConfigState::Manual => args
+                    .line_config
+                    .manual
                     .iter()
                     .map(|group| group.iter().map(|item| item.cap).sum::<usize>())
                     .sum(),
-                ArgLineCountState::Auto => args.line_config.auto.threads,
+                LineConfigState::Auto => args.line_config.auto.threads,
             },
-            nails: match args.table_shape.shape{
+            nails: match args.table_shape.shape {
                 crate::args::TableShapeMode::Ellipse => args.table_shape.ellipse.get(),
                 crate::args::TableShapeMode::Rectangle => args.table_shape.rectangle.get(),
             },
         }
     }
-    
+
     pub fn verbose(&mut self, message: Message) {
         self.synced.lock().message = Some(message);
     }
@@ -159,19 +217,19 @@ pub trait Computation: Send + Sync {
 
     fn build_instructions(&self) -> String;
 
-    fn get_line_config(&self) -> string_art::Config;
+    // fn get_line_config(&self) -> string_art::Config;
 }
 
-impl<N: nails::Handle<Link: ToString>> Computation for Algorithm<N> {
+impl<'a, C, N> Computation for Cmp<C, N>
+where
+    C: Send + Sync + string_art::slice::SliceOwner<'a, Item = color::Named>,
+    N: nails::Handle<Link: ToString>,
+{
     fn build_svg(&self, tickness: f32) -> svg::Document {
         self.build_svg(tickness)
     }
 
     fn build_instructions(&self) -> String {
         self.build_instructions()
-    }
-    
-    fn get_line_config(&self) -> string_art::Config {
-        self.line_selector().into()
     }
 }

@@ -13,7 +13,6 @@ bresenham = "0.1.1"
 image = { workspace = true }
 num-traits = { workspace = true }
 num_cpus = "1.16.0"
-rand = { version = "0.8.5", features = ["small_rng"] }
 rayon = { workspace = true }
 serde = { workspace = true }
 svg = { workspace = true }

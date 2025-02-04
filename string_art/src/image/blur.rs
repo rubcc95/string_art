@@ -1,8 +1,8 @@
 use num_traits::AsPrimitive;
 
-use crate::{geometry::Point, Float, PixelData};
+use crate::{geometry::Point, Float, image::PixelData};
 
-pub fn linear_blur<S: Float>(image: &PixelData<S>, radius: usize) -> Vec<S>
+pub fn blur<S: Float>(image: &PixelData<S>, radius: usize) -> Vec<S>
 where
     usize: AsPrimitive<S>,
 {
