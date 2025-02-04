@@ -71,7 +71,7 @@ impl App {
             self.computation = ComputationState::Running;
             let args = self.args.clone();
             let mut verboser = SyncedVerboser::new(self.sync_data.clone(), &args);
-            rayon::spawn(move || match args.create_algorithm(&mut verboser) {
+            rayon::spawn(move || match args.compute(&mut verboser) {
                 Ok(algorithm) => {
                     verboser.lock().computation = ComputationState::Completed(algorithm)
                 }
@@ -132,12 +132,10 @@ resolution values will require a darkness algorithm with a steeper gradient to m
 the algorithm will ignore when computing the next line.\n\nThis prevents the algorithm from drifting excessively along \
 the edges of the image. Additionally, the algorithm does not consider a nail when tracing a thread if it is not the \
 starting or ending nail of the line, so avoiding the tracing of edges is usually a good idea.");
+                    let val = (self.args.table_shape.value() / 2).saturating_sub(1);
                     ui.add(egui::Slider::new(
                         &mut self.args.min_nail_distance,
-                        0..=(match self.args.table_shape.shape{
-                            args::TableShapeMode::Ellipse => self.args.table_shape.ellipse,
-                            args::TableShapeMode::Rectangle => self.args.table_shape.rectangle,
-                        }.get() / 2).saturating_sub(1),
+                        0..=val,
                     ));
                 });
                 ui.horizontal(|ui| {
@@ -165,7 +163,7 @@ starting or ending nail of the line, so avoiding the tracing of edges is usually
 
         ui.separator();
 
-        self.args.line_config.form(ui, &self.args.palette);
+        self.args.line_form(ui);
 
         ui.separator();
 
@@ -190,8 +188,8 @@ starting or ending nail of the line, so avoiding the tracing of edges is usually
                             self.computation =
                                 mem::replace(&mut synced.computation, ComputationState::Idle);
                         }
-                        ComputationState::Completed(computation) => {
-                            self.args.line_config.manual = computation.get_line_config();
+                        ComputationState::Completed(_) => {
+                            //self.args.line_config.manual = computation.get_line_config();
                             self.computation =
                                 mem::replace(&mut synced.computation, ComputationState::Idle);
                         }

@@ -5,6 +5,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::Float;
 
+pub mod config;
+pub mod mapping;
+mod named;
+
+pub use mapping::Map;
+pub use named::Named;
+pub use config::Config;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Rgb<T = u8>(pub T, pub T, pub T);
 
@@ -17,8 +25,8 @@ impl<T: Copy + Mul<Output = T> + Add<Output = T> + Sub<Output = T>> Rgb<T> {
     }
 }
 
-impl<T: Float> Rgb<T>{
-    pub fn distance(&self, other: &Self) -> T{
+impl<T: Float> Rgb<T> {
+    pub fn distance(&self, other: &Self) -> T {
         num_traits::Float::sqrt(self.distance_squared(other))
     }
 }
@@ -31,13 +39,13 @@ impl<T: Add<Output = T>> Add for Rgb<T> {
     }
 }
 
-impl<T: Copy> From<Rgb<T>> for [T; 3]{
-    fn from(rgb: Rgb<T>) -> Self{
+impl<T: Copy> From<Rgb<T>> for [T; 3] {
+    fn from(rgb: Rgb<T>) -> Self {
         [rgb.0, rgb.1, rgb.2]
     }
 }
 
-impl<T: Copy> From<[T; 3]> for Rgb<T>{
+impl<T: Copy> From<[T; 3]> for Rgb<T> {
     fn from(value: [T; 3]) -> Self {
         Rgb(value[0], value[1], value[2])
     }
@@ -67,13 +75,20 @@ impl<T: Div<Output = T>> Div for Rgb<T> {
     }
 }
 
+pub trait AsRgb<T> {
+    fn as_rgb(&self) -> Rgb<T>;
+}
+
 impl<T: Copy> AsRgb<T> for Rgb<T> {
     fn as_rgb(&self) -> Rgb<T> {
         *self
     }
 }
 
-impl<S: Float> AsRgb<S> for Rgb where u8: AsPrimitive<S>{
+impl<S: Float> AsRgb<S> for Rgb
+where
+    u8: AsPrimitive<S>,
+{
     fn as_rgb(&self) -> Rgb<S> {
         Rgb(
             self.0.as_() / S::TWO_FIVE_FIVE,
@@ -82,21 +97,3 @@ impl<S: Float> AsRgb<S> for Rgb where u8: AsPrimitive<S>{
         )
     }
 }
-
-pub trait AsRgb<T> {
-    fn as_rgb(&self) -> Rgb<T>;
-}
-
-// pub trait AsLab<S>{
-//     fn as_lab(&self) -> Lab<S>;
-// }
-
-// impl<S: Float> AsLab<S> for Rgb where u8: AsPrimitive<S>{
-//     fn as_lab(&self) -> Lab<S>{
-//         Lab::from_color(palette::Srgb::new(
-//             self.0.as_() / S::TWO_FIVE_FIVE,
-//             self.1.as_() / S::TWO_FIVE_FIVE,
-//             self.2.as_() / S::TWO_FIVE_FIVE,
-//         ))
-//     }
-// }

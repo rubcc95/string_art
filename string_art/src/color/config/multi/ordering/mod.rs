@@ -1,19 +1,23 @@
+use crate::{
+    color::config::map_builder::Builder as MapBuilder,
+    slice::{Slice, SliceOwner},
+    verboser::Verboser,
+    image::Image,
+};
 use std::ops::Deref;
 
-use crate::{
-    color_map::ColorWeight,
-    slice_owner::{Slice, SliceOwner},
-    verboser::Verboser,
-    ColorConfig, Image,
-};
+pub mod auto;
+pub mod manual;
 
-pub unsafe trait Builder<S> {
-    fn build_line_selector<L, Sl: ?Sized + Slice<Item = ColorWeight<L, S>>>(
-        &self,
+pub unsafe trait Builder<'a, S> {
+    type Groups;
+
+    fn build_handle<L, Sl: ?Sized + Slice<'a, Item = MapBuilder<L, S>>>(
+        self,
         image: &Image<S>,
         weights: &Sl,
         verboser: &mut impl Verboser,
-    ) -> Result<Handle<Sl::Map<Group>>, Error>;
+    ) -> Result<Config<Self::Groups>, LALAError>;
 }
 
 #[derive(Clone, Copy)]
@@ -24,10 +28,10 @@ pub struct Item {
 }
 
 impl Item {
-    pub fn new(color_idx: usize, count: usize, cap: usize) -> Self {
+    pub fn new(color_idx: usize, cap: usize) -> Self {
         Item {
             color_idx,
-            count,
+            count: 0,
             cap,
         }
     }
@@ -41,18 +45,16 @@ impl Item {
     }
 }
 
-pub struct Group<S= Vec<Item>>(S);
+pub struct Group<S = Vec<Item>>(S);
 
-// impl<S: SliceOwner<Item = Item>> FromIterator<Item> for Group {
-//     fn from_iter<T: IntoIterator<Item = Item>>(iter: T) -> Self {
-//         Group(iter.into_iter().collect())
-//     }
-// }
+impl<'a, S: SliceOwner<'a, Item = Item>> Group<S> {
+    pub fn new(items: S) -> Self {
+        Group(items)
+    }
 
-impl<'a, S: 'a + SliceOwner<Item = Item>> Group<S> {
-    fn select_next(&'a mut self) -> Option<usize> {
+    fn select_next(&mut self) -> Option<usize> {
         let mut choice = None;
-        let mut best_ratio = 1.0;        
+        let mut best_ratio = 1.0;
         for item in self.0.as_mut_slice().raw_mut_slice().into_iter() {
             let ratio = item.count as f32 / item.cap as f32;
             if ratio < best_ratio {
@@ -76,12 +78,20 @@ impl Deref for Group {
     }
 }
 
-pub struct Handle<G> {
+pub struct Config<G> {
     groups: G,
     curr: usize,
 }
 
-impl<G: SliceOwner<Item = Group<I>>, I> Handle<G> {
+impl<'a, G: SliceOwner<'a>> Config<G> {
+    pub fn new(groups: G) -> Self {
+        Config {
+            curr: groups.len().checked_sub(1).unwrap_or(groups.len()),
+            groups,
+        }
+    }
+}
+impl<'a, G: SliceOwner<'a, Item = Group<I>>, I: 'a + SliceOwner<'a, Item = Item>> Config<G> {
     pub(crate) fn select_next(&mut self) -> Option<usize> {
         while let Some(last) = self.groups.as_mut_slice().get_mut(self.curr) {
             if let Some(res) = last.select_next() {
@@ -99,7 +109,7 @@ impl<G: SliceOwner<Item = Group<I>>, I> Handle<G> {
     }
 }
 
-impl<S> Deref for Handle<S> {
+impl<S> Deref for Config<S> {
     type Target = S;
 
     fn deref(&self) -> &Self::Target {
@@ -107,24 +117,6 @@ impl<S> Deref for Handle<S> {
     }
 }
 
-// impl<S> FromIterator<S> for Handle<S> {
-//     fn from_iter<T: IntoIterator<Item = S>>(iter: T) -> Self {
-//         let lines: Vec<_> = iter.into_iter().collect();
-//         Handle {
-//             curr: lines.len().checked_sub(1).unwrap_or(lines.len()),
-//             groups: lines,
-//         }
-//     }
-//     // fn from_iter<T: IntoIterator<Item = Group>>(iter: T) -> Self {
-//     //     let lines: Vec<_> = iter.into_iter().collect();
-//     //     Handle{
-//     //         curr: lines.len().checked_sub(1).unwrap_or(lines.len()),
-//     //         groups: lines,
-
-//     //     }
-//     // }
-// }
-
 #[derive(Debug, thiserror::Error)]
 #[error("Invalid group index")]
-pub struct Error;
+pub struct LALAError;

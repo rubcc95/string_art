@@ -1,96 +1,104 @@
 use egui::WidgetText;
-use num_traits::AsPrimitive;
 use serde::{Deserialize, Serialize};
-use string_art::{
-    auto_line_config::AutoLineGroupConfig,
-    line_config::{Group, Item},
-    color_handle::{self, Handle},
-    verboser::Verboser,
-    AutoLineConfig, ColorWeight, Float, Image, Config,
-};
-
-use super::NamedColor;
+use string_art::color::{self, config::multi};
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct ArgLineCount {
-    pub manual: string_art::Config,
-    pub auto: AutoLineConfig<f32>,
-    pub state: ArgLineCountState,
+pub struct LineConfig {
+    pub manual: multi::Manual,
+    pub auto: multi::Auto,
+    pub single: usize,
+    pub state: LineConfigState,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ArgLineCountState {
+pub enum LineConfigState {
     Manual,
     Auto,
 }
 
-impl From<&ArgLineCount> for WidgetText {
-    fn from(value: &ArgLineCount) -> Self {
+impl From<&LineConfig> for WidgetText {
+    fn from(value: &LineConfig) -> Self {
         match value.state {
-            ArgLineCountState::Manual => "Manual".into(),
-            ArgLineCountState::Auto => "Auto".into(),
+            LineConfigState::Manual => "Manual".into(),
+            LineConfigState::Auto => "Auto".into(),
         }
     }
 }
 
-impl ArgLineCount {
+impl LineConfig {
     pub fn new(
-        manual: string_art::Config,
-        auto: AutoLineConfig<f32>,
-        state: ArgLineCountState,
+        manual: multi::Manual,
+        auto: multi::Auto,
+        single: usize,
+        state: LineConfigState,
     ) -> Self {
         Self {
             manual,
             auto,
+            single,
             state,
         }
     }
 
-    pub fn form(&mut self, ui: &mut egui::Ui, palette: &[NamedColor]) {
-        egui::ComboBox::from_id_salt(self as *mut _)
-            .selected_text(&*self)
-            .show_ui(ui, |ui| {
-                ui.selectable_value(&mut self.state, ArgLineCountState::Auto, "Auto");
-                ui.selectable_value(&mut self.state, ArgLineCountState::Manual, "Manual");
+    pub fn form(&mut self, ui: &mut egui::Ui, palette: &[color::Named]) {
+        if palette.len() > 1 {
+            egui::ComboBox::from_id_salt(self as *mut _)
+                .selected_text(&*self)
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut self.state, LineConfigState::Auto, "Auto");
+                    ui.selectable_value(&mut self.state, LineConfigState::Manual, "Manual");
+                });
+            match self.state {
+                LineConfigState::Manual => {
+                    Self::manual_form(&mut self.manual, ui, palette);
+                }
+                LineConfigState::Auto => {
+                    Self::auto_form(&mut self.auto, ui, palette);
+                }
+            }
+        } else {
+            ui.horizontal(|ui| {
+                ui.add_space(10.0);
+                ui.label("Threads:")
+                    .on_hover_text("Number of threads used when generating the image.");
+                ui.add(
+                    egui::Slider::new(&mut self.single, 1..=20000)
+                        .clamping(egui::SliderClamping::Never),
+                );
             });
-        match self.state {
-            ArgLineCountState::Manual => {
-                Self::manual_form(&mut self.manual, ui, palette);
-            }
-            ArgLineCountState::Auto => {
-                Self::auto_form(&mut self.auto, ui, palette);
-            }
         }
     }
 
-    fn manual_form(groups: &mut Config, ui: &mut egui::Ui, palette: &[NamedColor]) {
+    fn manual_form(groups: &mut multi::Manual, ui: &mut egui::Ui, palette: &[color::Named]) {
         ui.horizontal(|ui| {
             ui.add_space(10.0);
             ui.label("Color order:");
             if palette.len() > 0 && ui.button("+").clicked() {
-                groups.push(Group::new(
+                groups.push(multi::manual::Group::new(
                     (0..palette.len())
                         .into_iter()
-                        .map(|idx| Item::new(idx, 1000))
+                        .map(|idx| multi::manual::Item::new(idx, 1000))
                         .collect(),
                 ));
             }
         });
         let mut removed_group = None;
+        let groups_len = groups.len();
         for (group_idx, group) in groups.iter_mut().enumerate() {
             ui.horizontal(|ui| {
                 ui.add_space(20.0);
                 //ui.label();
-                if ui.button("🗑").clicked() {
+                if groups_len > 1 && ui.button("🗑").clicked() {
                     removed_group = Some(group_idx);
                 }
                 if ui.button("+").clicked() {
-                    group.push(Item::new(0, 1000));
+                    group.push(multi::manual::Item::new(0, 1000));
                 }
                 egui::CollapsingHeader::new(format!("Group {}.", group_idx + 1))
                     .default_open(false)
                     .show(ui, |ui| {
                         let mut removed_element = None;
+                        let element_len = group.len();
                         for (element_idx, item_config) in group.iter_mut().enumerate() {
                             ui.horizontal(|ui| {
                                 ui.add_space(30.0);
@@ -111,7 +119,7 @@ impl ArgLineCount {
                                     egui::Slider::new(&mut item_config.cap, 1..=10000)
                                         .clamping(egui::SliderClamping::Never),
                                 );
-                                if ui.button("🗑").clicked() {
+                                if element_len > 1 && ui.button("🗑").clicked() {
                                     removed_element = Some(element_idx);
                                 }
                             });
@@ -127,7 +135,7 @@ impl ArgLineCount {
         }
     }
 
-    fn auto_form(groups: &mut AutoLineConfig<f32>, ui: &mut egui::Ui, palette: &[NamedColor]) {
+    fn auto_form(groups: &mut multi::Auto, ui: &mut egui::Ui, palette: &[color::Named]) {
         ui.horizontal(|ui| {
             ui.add_space(10.0);
             ui.label("Threads:")
@@ -141,17 +149,18 @@ impl ArgLineCount {
             ui.add_space(10.0);
             ui.label("Color order:");
             if palette.len() > 0 && ui.button("+").clicked() {
-                groups.push(AutoLineGroupConfig::new(
+                groups.push(multi::auto::Group::new(
                     (0..palette.len()).into_iter().collect(),
                     0.5,
                 ));
             }
         });
         let mut removed_group = None;
+        let groups_len = groups.len();
         for (group_idx, group) in groups.iter_mut().enumerate() {
             ui.horizontal(|ui| {
                 ui.add_space(20.0);
-                if ui.button("🗑").clicked() {
+                if groups_len > 1 && ui.button("🗑").clicked() {
                     removed_group = Some(group_idx);
                 }
                 ui.add(egui::Slider::new(&mut group.weight, 0.0..=1.0).show_value(false));
@@ -162,6 +171,7 @@ impl ArgLineCount {
                     .default_open(false)
                     .show(ui, |ui| {
                         let mut removed_element = None;
+                        let element_len = group.colors.len();
                         for (element_idx, color_idx) in group.colors.iter_mut().enumerate() {
                             ui.horizontal(|ui| {
                                 egui::ComboBox::from_id_salt(color_idx as *mut _)
@@ -173,7 +183,7 @@ impl ArgLineCount {
                                             ui.selectable_value(color_idx, idx, &color.name);
                                         }
                                     });
-                                if ui.button("🗑").clicked() {
+                                if element_len > 1 && ui.button("🗑").clicked() {
                                     removed_element = Some(element_idx);
                                 }
                             });
@@ -186,24 +196,6 @@ impl ArgLineCount {
         }
         if let Some(idx) = removed_group {
             groups.remove(idx);
-        }
-    }
-}
-
-unsafe impl<S: Float> color_handle::Builder<S> for ArgLineCount
-where
-    f32: AsPrimitive<S>,
-    usize: AsPrimitive<S>,
-{
-    fn build_line_selector<L>(
-        &self,
-        image: &Image<S>,
-        palette: &[ColorWeight<L, S>],
-        verboser: &mut impl Verboser,
-    ) -> Result<Handle, color_handle::Error> {
-        match self.state {
-            ArgLineCountState::Manual => self.manual.build_line_selector(image, palette, verboser),
-            ArgLineCountState::Auto => self.auto.build_line_selector(image, palette, verboser),
         }
     }
 }

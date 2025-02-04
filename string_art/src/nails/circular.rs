@@ -1,4 +1,3 @@
-use rand::{distributions::Standard, prelude::Distribution, Rng};
 
 use crate::{
     geometry::{
@@ -138,12 +137,6 @@ impl From<Direction> for usize {
 impl From<usize> for Direction {
     fn from(direction: usize) -> Self {
         Direction(unsafe { core::mem::transmute(direction as u8) })
-    }
-}
-
-impl Distribution<Direction> for Standard{
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Direction {
-        Direction(unsafe { core::mem::transmute(rng.gen_range::<u8,_>(0..2)) })
     }
 }
 

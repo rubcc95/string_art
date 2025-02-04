@@ -174,11 +174,17 @@ pub struct BakedNailTable<N: nails::Handle> {
     distancer: NailDistancer,
 }
 
+impl<N: nails::Handle> From<BakedNailTable<N>> for NailTable<N>{
+    fn from(value: BakedNailTable<N>) -> Self {
+        value.table
+    }
+}
+
 impl<N: nails::Handle<Error: std::error::Error>> BakedNailTable<N> {
-    pub fn new(table: NailTable<N>, min_nail_distance: usize) -> Result<Self, BakeError<N::Error>> {
+    pub fn new(table: NailTable<N>, min_nail_distance: usize) -> Result<Self, Error<N::Error>> {
         let nail_count = table.nails.len();
         let distancer =
-            NailDistancer::new(nail_count, min_nail_distance).map_err(BakeError::Distancer)?;
+            NailDistancer::new(nail_count, min_nail_distance).map_err(Error::Distancer)?;
         let nails = &table.nails;
 
         Ok(Self {
@@ -216,7 +222,7 @@ impl<N: nails::Handle<Error: std::error::Error>> BakedNailTable<N> {
                 })
                 .flatten()
                 .collect::<Result<_, _>>()
-                .map_err(BakeError::Nail)?,
+                .map_err(Error::Nail)?,
             table,
             distancer,
         })
@@ -268,7 +274,7 @@ impl<S> Deref for BakedSegment<S> {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum BakeError<N> {
+pub enum Error<N> {
     #[error(transparent)]
     Nail(N),
     #[error(transparent)]
