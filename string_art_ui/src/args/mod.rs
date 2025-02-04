@@ -10,25 +10,24 @@ use std::{
 use string_art::{
     color::{
         self,
-        config::{multi as config, Handle},
-        Config, Rgb,
+        config::multi as config,
+        Rgb,
     },
     darkness::{Darkness, FlatDarkness, PercentageDarkness},
-    nails::{Builder, Circular, Handle as NHandle},
-    slice::SliceOwner,
-    Float, Image, NailTable,
+    nails::{self, Circular},
+    BakedNailTable, Float, Image, NailTable,
 };
 
 use super::synced::Computation;
 
-mod line_config;
 mod darkness_mode;
+mod line_config;
 mod nail_shape;
 mod precision;
 mod table_shape;
 
-pub use line_config::{LineConfig, LineConfigState};
 pub use darkness_mode::DarknessMode;
+pub use line_config::{LineConfig, LineConfigState};
 pub use nail_shape::NailShape;
 pub use precision::Precision;
 pub use table_shape::{TableShape, TableShapeMode};
@@ -401,7 +400,7 @@ impl ArgsF {
         f32: AsPrimitive<N::Scalar>,
         D: Darkness<N::Scalar> + Send + Sync + 'static,
         N: SyncedBuilder,
-        C: SyncedConfig<<N::Handle as NHandle>::Link, N::Scalar>,
+        C: SyncedConfig<<N::Handle as nails::Handle>::Link, N::Scalar>,
     {
         match &self.file_path {
             Some(file_path) => {
@@ -433,8 +432,7 @@ impl ArgsF {
 
                 //let a= string_art::color::Config::into_color_handle(config, &image, 100, self.blur_radius, self.contrast.as_()).unwrap();
                 let a = string_art::compute(
-                    table,
-                    self.min_nail_distance,
+                    BakedNailTable::new(table, self.min_nail_distance).map_err(|err| Error::Computation(Box::new(err)))?,
                     &image,
                     config,
                     darkness,
@@ -445,18 +443,7 @@ impl ArgsF {
 
                 match a {
                     Ok(computation) => {
-                        let cmp: string_art::Computation<
-                            <<<C as Config<
-                                '_,
-                                <<N as Builder>::Handle as NHandle>::Link,
-                                <N as Builder>::Scalar,
-                            >>::Handle as Handle<
-                                '_,
-                                <<N as Builder>::Handle as NHandle>::Link,
-                                <N as Builder>::Scalar,
-                            >>::Owner as SliceOwner<'_>>::Map<'_, color::Named>,
-                            <N as Builder>::Handle,
-                        > = computation;
+                        let cmp = computation;
                         Ok(Box::new(cmp))
                     }
                     Err(err) => Err(Error::Computation(Box::new(err))),

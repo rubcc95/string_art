@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::ops::{Deref, Range};
 
 use num_traits::{AsPrimitive, ConstOne as _, Float as _};
 
@@ -168,13 +168,106 @@ pub enum SquareTableError {
     NotMultipleOf4,
 }
 
+/// The `Baked` trait is an unsafe trait that provides methods for working with a baked nail table.
+/// Implementors of this trait must ensure certain invariants are upheld, as described in the safety
+/// comments for each method.
+///
+/// # Safety
+///
+/// - [`Self::nails`].[`len()`] must be constant.
+/// - [`Self::segments()`].[`len()`] and [`Self::segments_mut()`].[`len()`] must be constant and equal.
+/// - `[Self::comb_count()]` must be constant for valid arguments.
+/// - The return value of [`Self::segment_idx`] must be within the ranges
+///   (0..[`Self::nails(&self)`].[`len()`], 0..[`Self::segments()`].[`len()`]) for valid arguments.
+///
+/// [`len()`]: https://doc.rust-lang.org/std/primitive.slice.html#method.len
+pub unsafe trait Baked: Send + Sync {
+    type Handle: nails::Handle;
+
+    /// Returns a slice of nails.
+    fn nails(&self) -> &[<Self::Handle as nails::Handle>::Nail];
+
+    /// Returns a range of combination counts for a given nail index.
+    ///
+    /// # Safety
+    ///
+    /// `nail_idx` must be in the range 0..[`Self::nails`].[`len()`].
+    ///
+    /// [`len()`]: https://doc.rust-lang.org/std/primitive.slice.html#method.len
+    unsafe fn comb_count(&self, nail_idx: usize) -> Range<usize>;
+
+    /// Returns the segment index for a given nail index, link, offset, and other link.
+    ///
+    /// # Safety
+    ///
+    /// - `nail_idx` must be in the range 0..[`Self::nails`].[`len()`].
+    /// - `offset` must be in the range [`Self::comb_count`].
+    ///
+    /// [`len()`]: https://doc.rust-lang.org/std/primitive.slice.html#method.len
+    unsafe fn segment_idx(
+        &self,
+        nail_idx: usize,
+        link: <Self::Handle as nails::Handle>::Link,
+        offset: usize,
+        other_link: <Self::Handle as nails::Handle>::Link,
+    ) -> (usize, usize);
+
+    /// Returns a mutable slice of baked segments.
+    fn segments(&mut self) -> &mut [BakedSegment<<Self::Handle as nails::Handle>::Scalar>];
+
+    /// Returns the nail handle associated to this baked instance.
+    fn handle(&self) -> &Self::Handle;
+}
+
+unsafe impl<N: nails::Handle> Baked for BakedNailTable<N> {
+    type Handle = N;
+
+    fn nails(&self) -> &[<Self::Handle as nails::Handle>::Nail] {
+        &self.nails
+    }
+
+    unsafe fn comb_count(&self, _: usize) -> Range<usize> {
+        0..self.distancer.distance()
+    }
+
+    unsafe fn segment_idx(
+        &self,
+        nail_idx: usize,
+        link: <Self::Handle as nails::Handle>::Link,
+        offset: usize,
+        other_link: <Self::Handle as nails::Handle>::Link,
+    ) -> (usize, usize) {
+        let total = nail_idx + offset;
+        let other = if total < self.nails.len() {
+            total
+        } else {
+            total.unchecked_sub(self.nails.len())
+        };
+        (
+            other,
+            self.distancer
+                .index_of_unchecked::<<Self::Handle as nails::Handle>::Links>(
+                    nail_idx, link, other, other_link,
+                ),
+        )
+    }
+
+    fn segments(&mut self) -> &mut [BakedSegment<<Self::Handle as nails::Handle>::Scalar>] {
+        &mut self.segments
+    }
+
+    fn handle(&self) -> &Self::Handle {
+        &self.table.handle
+    }
+}
+
 pub struct BakedNailTable<N: nails::Handle> {
     table: NailTable<N>,
     segments: Vec<BakedSegment<N::Scalar>>,
     distancer: NailDistancer,
 }
 
-impl<N: nails::Handle> From<BakedNailTable<N>> for NailTable<N>{
+impl<N: nails::Handle> From<BakedNailTable<N>> for NailTable<N> {
     fn from(value: BakedNailTable<N>) -> Self {
         value.table
     }
@@ -228,13 +321,13 @@ impl<N: nails::Handle<Error: std::error::Error>> BakedNailTable<N> {
         })
     }
 
-    pub fn distancer(&self) -> &NailDistancer {
-        &self.distancer
-    }
+    // pub fn distancer(&self) -> &NailDistancer {
+    //     &self.distancer
+    // }
 
-    pub(crate) fn segments_mut(&mut self) -> &mut [BakedSegment<N::Scalar>] {
-        &mut self.segments
-    }
+    // pub(crate) fn segments_mut(&mut self) -> &mut [BakedSegment<N::Scalar>] {
+    //     &mut self.segments
+    // }
 }
 
 impl<N: nails::Handle> Deref for BakedNailTable<N> {
@@ -249,6 +342,21 @@ impl<N: nails::Handle> Deref for BakedNailTable<N> {
 pub struct BakedSegment<S> {
     segment: Segment<S>,
     used: bool,
+}
+
+impl<S> From<Segment<S>> for BakedSegment<S> {
+    fn from(segment: Segment<S>) -> Self {
+        Self {
+            segment,
+            used: false,
+        }
+    }
+}
+
+impl<S> From<BakedSegment<S>> for Segment<S>{
+    fn from(value: BakedSegment<S>) -> Self {
+        value.segment
+    }
 }
 
 impl<S> BakedSegment<S> {

@@ -2,9 +2,7 @@ use std::{ops::Deref, sync::Arc};
 
 use egui::mutex::Mutex;
 use string_art::{
-    color, nails, slice,
-    verboser::{self, Verboser},
-    Computation as Cmp,
+    color, nails, slice, verboser::{self, Verboser}, Baked, Computation as Cmp
 };
 
 use crate::{
@@ -220,8 +218,9 @@ pub trait Computation: Send + Sync {
     // fn get_line_config(&self) -> string_art::Config;
 }
 
-impl<'a, C, N> Computation for Cmp<C, N>
+impl<'a, N, B, C> Computation for Cmp<N, B, C>
 where
+    B: Baked<Handle= N>,
     C: Send + Sync + string_art::slice::SliceOwner<'a, Item = color::Named>,
     N: nails::Handle<Link: ToString>,
 {
