@@ -25,4 +25,4 @@ pub use darkness::Darkness;
 pub use float::Float;
 pub use grid::Grid;
 pub use image::Image;
-pub use nail_table::NailTable;
+pub use nail_table::*;

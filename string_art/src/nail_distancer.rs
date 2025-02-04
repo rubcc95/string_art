@@ -20,24 +20,34 @@ impl NailDistancer {
         }
     }
 
+    // pub fn min(&self) -> usize{
+    //     self.min
+    // }
+
+    pub fn distance(&self) -> usize {
+        unsafe { self.max.unchecked_sub(self.min) }
+    }   
+
+    //NOTE: This does not check if a_idx and b_idx are inside bounds.
+    // a_idx and b_idx must be also inside bounds in order to be valid.
     pub fn is_valid(&self, a_idx: usize, b_idx: usize) -> bool {
         let diff = a_idx.abs_diff(b_idx);
         diff > self.min && diff < self.max
     }
 
-    pub fn index_of<L: nails::Links>(
-        &self,
-        a_idx: usize,
-        a_link: L::Item,
-        b_idx: usize,
-        b_link: L::Item,
-    ) -> Option<usize> {
-        if self.is_valid(a_idx, b_idx) {
-            Some(unsafe { self.index_of_unchecked::<L>(a_idx, a_link, b_idx, b_link) })
-        } else {
-            None
-        }
-    }
+    // pub fn index_of<L: nails::Links>(
+    //     &self,
+    //     a_idx: usize,
+    //     a_link: L::Item,
+    //     b_idx: usize,
+    //     b_link: L::Item,
+    // ) -> Option<usize> {
+    //     if self.is_valid(a_idx, b_idx) {
+    //         Some(unsafe { self.index_of_unchecked::<L>(a_idx, a_link, b_idx, b_link) })
+    //     } else {
+    //         None
+    //     }
+    // }
 
     //SAFETY: caller must ensure that the indices are valid via NailDistancer::is_valid
     pub unsafe fn index_of_unchecked<L: nails::Links>(
