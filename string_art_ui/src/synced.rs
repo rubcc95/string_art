@@ -2,7 +2,7 @@ use std::{ops::Deref, sync::Arc};
 
 use egui::mutex::Mutex;
 use string_art::{
-    color, nails, slice, verboser::{self, Verboser}, Baked, Computation as Cmp
+    color, nails, slice, verboser::{self, Verboser}, NailTable, Computation as Cmp
 };
 
 use crate::{
@@ -29,7 +29,7 @@ impl<T> Deref for Synced<T> {
 
 pub trait SyncedBuilder:
     nails::Builder<
-    Handle: nails::Handle<Nail: Send + Sync, Link: Default + Send + Sync + ToString>
+    Handle: nails::Handle<Link: Default + ToString>
                 + Send
                 + Sync
                 + 'static,
@@ -48,14 +48,14 @@ impl<
 {
 }
 
-pub trait SyncedConfig<L: 'static, S: 'static>:
+pub trait SyncedConfig<I: 'static, L: 'static, S: 'static>:
     'static
     + color::Config<
         'static,
-        L,
         S,
-        Handle: color::config::Handle<
+        Handle<I, L>: color::config::Handle<
             'static,
+            I,
             L,
             S,
             Owner: slice::SliceOwner<'static, Map<'static, color::Named>: Send + Sync>,
@@ -64,14 +64,14 @@ pub trait SyncedConfig<L: 'static, S: 'static>:
 {
 }
 
-impl<T, L: 'static, S: 'static> SyncedConfig<L, S> for T where
+impl<T, I: 'static, L: 'static, S: 'static> SyncedConfig<I, L, S> for T where
     T: 'static
         + color::Config<
             'static,
-            L,
             S,
-            Handle: color::config::Handle<
+            Handle<I, L>: color::config::Handle<
                 'static,
+                I,
                 L,
                 S,
                 Owner: slice::SliceOwner<'static, Map<'static, color::Named>: Send + Sync>,
@@ -220,7 +220,7 @@ pub trait Computation: Send + Sync {
 
 impl<'a, N, B, C> Computation for Cmp<N, B, C>
 where
-    B: Baked<Handle= N>,
+    B: NailTable<Handle= N>,
     C: Send + Sync + string_art::slice::SliceOwner<'a, Item = color::Named>,
     N: nails::Handle<Link: ToString>,
 {

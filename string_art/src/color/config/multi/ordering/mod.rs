@@ -12,7 +12,7 @@ pub mod manual;
 pub unsafe trait Builder<'a, S> {
     type Groups;
 
-    fn build_handle<L, Sl: ?Sized + Slice<'a, Item = MapBuilder<L, S>>>(
+    fn build_handle<I, L, Sl: ?Sized + Slice<'a, Item = MapBuilder<I, L, S>>>(
         self,
         image: &Image<S>,
         weights: &Sl,

@@ -4,18 +4,16 @@ use num_traits::AsPrimitive;
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
 use std::{
+    fmt::Display,
     num::NonZero,
     ops::{Deref, DerefMut},
 };
 use string_art::{
-    color::{
-        self,
-        config::multi as config,
-        Rgb,
-    },
+    color::{self, config::multi as config, Rgb},
     darkness::{Darkness, FlatDarkness, PercentageDarkness},
+    nail_table,
     nails::{self, Circular},
-    BakedNailTable, Float, Image, NailTable,
+    Float, Image, NailTable,
 };
 
 use super::synced::Computation;
@@ -127,25 +125,28 @@ impl DerefMut for ArgsD {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ArgsN {
     inner: ArgsF,
-    /// Colors of the palete. Acepta sintaxis del tipo "white:FFF", "white:FFFFFF",
-    /// "black:0,0,0" y varios colores comunes identificados directamente por su nombre
-    pub palette: Vec<color::Named>,
-    pub line_config: LineConfig,
+    /// Input file path.
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
+    pub file_path: Option<String>,
+    /// Number of nails surrounding the image.    
+    //pub nails: NonZero<usize>,
+    pub table_shape: TableShape,
+    /// Minimum nail count between linked nails.
+    pub min_nail_distance: usize,
 }
 
 impl Default for ArgsN {
     fn default() -> Self {
         Self {
             inner: Default::default(),
-            palette: vec![color::Named::new(String::from("Black"), Rgb(0, 0, 0))],
-            line_config: LineConfig::new(
-                config::Manual::new(vec![config::manual::Group::new(vec![
-                    config::manual::Item::new(0, 12000),
-                ])]),
-                config::Auto::new(vec![config::auto::Group::new(vec![0], 0.5)], 12000),
-                4000,
-                LineConfigState::Auto,
-            ),
+            file_path: None,
+            table_shape: TableShape {
+                rectangle: unsafe { NonZero::new_unchecked(512) },
+                ellipse: unsafe { NonZero::new_unchecked(512) },
+                shape: TableShapeMode::Ellipse,
+            },
+            min_nail_distance: 20,
         }
     }
 }
@@ -166,36 +167,57 @@ impl DerefMut for ArgsN {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ArgsF {
-    /// Input file path.
-    #[serde(skip_serializing)]
-    #[serde(skip_deserializing)]
-    pub file_path: Option<String>,
-    /// Number of nails surrounding the image.    
-    //pub nails: NonZero<usize>,
-    pub table_shape: TableShape,
+    pub inner: ArgsT,
+    pub palette: Vec<color::Named>,
+    pub line_config: LineConfig,
+}
+
+impl Deref for ArgsF {
+    type Target = ArgsT;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for ArgsF {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+impl Default for ArgsF {
+    fn default() -> Self {
+        Self {
+            inner: Default::default(),
+            palette: vec![color::Named::new(String::from("Black"), Rgb(0, 0, 0))],
+            line_config: LineConfig::new(
+                config::Manual::new(vec![config::manual::Group::new(vec![
+                    config::manual::Item::new(0, 12000),
+                ])]),
+                config::Auto::new(vec![config::auto::Group::new(vec![0], 0.5)], 12000),
+                4000,
+                LineConfigState::Auto,
+            ),
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ArgsT {
     /// Size in pixels of the longest side of the image.
     pub resolution: NonZero<u32>,
     /// Darkness mode of processing.
     pub contrast: f32,
     pub blur_radius: usize,
-    /// Minimum nail count between linked nails.
-    pub min_nail_distance: usize,
     pub tickness: f32,
 }
 
-impl Default for ArgsF {
+impl Default for ArgsT {
     fn default() -> Self {
         Self {
-            file_path: None,
-            table_shape: TableShape {
-                rectangle: unsafe { NonZero::new_unchecked(512) },
-                ellipse: unsafe { NonZero::new_unchecked(512) },
-                shape: TableShapeMode::Ellipse,
-            },
             resolution: unsafe { NonZero::new_unchecked(1000) },
             contrast: 0.5,
             blur_radius: 4,
-            min_nail_distance: 20,
             tickness: 0.25,
         }
     }
@@ -357,51 +379,6 @@ impl ArgsN {
         D: Darkness<N::Scalar> + Send + Sync + 'static,
         N: SyncedBuilder,
     {
-        let palette: Vec<_> = self
-            .palette
-            .iter()
-            .map(|color| {
-                string_art::color::mapping::State::new(color.clone(), 0, Default::default())
-            })
-            .collect();
-
-        match &self.line_config.state {
-            LineConfigState::Manual => self.inner.compute(
-                darkness,
-                handle,
-                verboser,
-                config::Config::new(palette, self.line_config.manual),
-            ),
-            LineConfigState::Auto => self.inner.compute(
-                darkness,
-                handle,
-                verboser,
-                config::Config::new(palette, self.line_config.auto),
-            ),
-        }
-    }
-
-    pub fn line_form(&mut self, ui: &mut egui::Ui) {
-        self.line_config.form(ui, &self.palette);
-    }
-}
-
-impl ArgsF {
-    fn compute<D, N, C>(
-        self,
-        darkness: D,
-        handle: N,
-        verboser: &mut SyncedVerboser,
-        config: C,
-    ) -> Result<Box<dyn Computation>, Error>
-    where
-        usize: AsPrimitive<N::Scalar>,
-        u8: AsPrimitive<N::Scalar>,
-        f32: AsPrimitive<N::Scalar>,
-        D: Darkness<N::Scalar> + Send + Sync + 'static,
-        N: SyncedBuilder,
-        C: SyncedConfig<<N::Handle as nails::Handle>::Link, N::Scalar>,
-    {
         match &self.file_path {
             Some(file_path) => {
                 verboser.verbose(Message::new(MessageType::LoadingImage, "Loading image..."));
@@ -414,42 +391,121 @@ impl ArgsF {
                         image::imageops::FilterType::Lanczos3,
                     )
                     .into();
-                let table = match self.table_shape.shape {
-                    TableShapeMode::Ellipse => NailTable::ellipse(
-                        *image.grid(),
-                        handle,
-                        self.table_shape.ellipse.get(),
-                        verboser,
-                    ),
-                    TableShapeMode::Rectangle => NailTable::square(
-                        *image.grid(),
-                        handle,
-                        self.table_shape.rectangle.get(),
-                        verboser,
-                    )
-                    .map_err(|err| Error::Computation(Box::new(err)))?,
-                };
-
-                //let a= string_art::color::Config::into_color_handle(config, &image, 100, self.blur_radius, self.contrast.as_()).unwrap();
-                let a = string_art::compute(
-                    BakedNailTable::new(table, self.min_nail_distance).map_err(|err| Error::Computation(Box::new(err)))?,
-                    &image,
-                    config,
-                    darkness,
-                    self.contrast.as_(),
-                    self.blur_radius,
-                    verboser,
-                );
-
-                match a {
-                    Ok(computation) => {
-                        let cmp = computation;
-                        Ok(Box::new(cmp))
+                match self.table_shape.shape {
+                    TableShapeMode::Ellipse => {
+                        let table = nail_table::Ellipse::new(
+                            *image.rect(),
+                            handle,
+                            self.table_shape.ellipse.get(),
+                            verboser,
+                            self.min_nail_distance,
+                        )
+                        .map_err(|err| Error::Computation(Box::new(err)))?;
+                        self.inner.compute(darkness, verboser, table, &image)
                     }
-                    Err(err) => Err(Error::Computation(Box::new(err))),
+                    TableShapeMode::Rectangle => {
+                        let table = nail_table::Rectangle::new(
+                            image.rect().as_(),
+                            handle,
+                            self.table_shape.ellipse.get(),
+                            verboser,
+                        )
+                        .map_err(|err| Error::Computation(Box::new(err)))?;
+                        self.inner.compute(darkness, verboser, table, &image)
+                    }
                 }
             }
             None => Err(Error::MissingFilePath),
+        }
+    }
+}
+
+impl ArgsF {
+    pub fn line_form(&mut self, ui: &mut egui::Ui) {
+        self.line_config.form(ui, &self.palette);
+    }
+    fn compute<D, T, S>(
+        self,
+        darkness: D,
+        verboser: &mut SyncedVerboser,
+        table: T,
+        image: &Image<S>,
+    ) -> Result<Box<dyn Computation>, Error>
+    where
+        usize: AsPrimitive<S>,
+        u8: AsPrimitive<S>,
+        f32: AsPrimitive<S>,
+        S: Float,
+        D: Darkness<S> + Send + Sync + 'static,
+        T: 'static
+            + NailTable<
+                Id: 'static,
+                Handle: 'static + nails::Handle<Scalar = S, Link: 'static + ToString>,
+            >,
+    {
+        match &self.line_config.state {
+            LineConfigState::Manual => self.inner.compute(
+                table,
+                darkness,
+                verboser,
+                config::Config::new(self.palette, self.line_config.manual),
+                image,
+            ),
+            // .compute(
+            //     darkness,
+            //     handle,
+            //     verboser,
+            //     config::Config::new(self.palette, self.line_config.manual),
+            // ),
+            LineConfigState::Auto => self.inner.compute(
+                table,
+                darkness,
+                verboser,
+                config::Config::new(self.palette, self.line_config.auto),
+                image,
+            ),
+        }
+    }
+}
+
+impl ArgsT {
+    fn compute<D, T, S, C>(
+        self,
+        table: T,
+        darkness: D,
+        verboser: &mut SyncedVerboser,
+        config: C,
+        image: &Image<S>,
+    ) -> Result<Box<dyn Computation>, Error>
+    where
+        usize: AsPrimitive<S>,
+        u8: AsPrimitive<S>,
+        f32: AsPrimitive<S>,
+        S: Float,
+        D: Darkness<S> + Send + Sync + 'static,
+        T: 'static
+            + NailTable<
+                Id: 'static,
+                Handle: 'static + nails::Handle<Scalar = S, Link: 'static + ToString>,
+            >,
+        C: SyncedConfig<T::Id, <T::Handle as nails::Handle>::Link, S>,
+    {
+        let a = string_art::compute(
+            table,
+            image,
+            config,
+            darkness,
+            self.contrast.as_(),
+            self.blur_radius,
+            verboser,
+        );
+
+        match a {
+            Ok(computation) => {
+                let cmp = computation;
+                Ok(Box::new(cmp))
+            }
+            Err(err) => Err(Error::Computation(Box::new(err))),
         }
     }
 }

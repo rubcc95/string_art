@@ -1,17 +1,20 @@
 pub mod circular;
+pub mod point;
+
+pub use circular::Circular;
+pub use point::Point;
 
 use crate::Float;
-pub use circular::Circular;
 use svg::Node;
 
-use crate::geometry::{Point, Segment};
+use crate::geometry::{Point as Pt, Segment};
 
 pub trait Builder {
     type Scalar: Float;
     type Nail: Copy;
     type Handle: Handle<Scalar = Self::Scalar, Nail = Self::Nail>;
 
-    fn build_nail(&self, position: Point<Self::Scalar>, rotation: Self::Scalar) -> Self::Nail;
+    fn build_nail(&self, position: Pt<Self::Scalar>, rotation: Self::Scalar) -> Self::Nail;
     fn offset(&self) -> Self::Scalar;
     fn build_handle(self) -> Self::Handle;    
 }
@@ -27,7 +30,7 @@ pub trait Handle: Copy + Send + Sync {
     type Scalar: Float;
     type Nail: Copy + Send + Sync;
     type Links: Links<Link = Self::Link>;
-    type Link: Copy + Into<usize> + From<usize> + Send + Sync;
+    type Link: Copy + Into<usize> + From<usize> + Send + Sync + Default;
     type Error: std::error::Error;
 
     const LINKS: Self::Links;

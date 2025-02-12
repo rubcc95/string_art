@@ -38,14 +38,14 @@ where
 {
     type Groups = G::Map<'a, super::Group<C::Map<'a, super::Item>>>;
 
-    fn build_handle<L, Sl: ?Sized + Slice<'a, Item = MapBuilder<L, S>>>(
+    fn build_handle<I, L, Sl: ?Sized + Slice<'a, Item = MapBuilder<I, L, S>>>(
         self,
         image: &Image<S>,
         weights: &Sl,
         _: &mut impl Verboser,
     ) -> Result<super::Config<Self::Groups>, super::LALAError> {
-        let mut weights: <Sl as Slice<'_>>::Map<'_, AutoLineDitherCounter<'_, L, S>> =
-            weights.map(|counter: &MapBuilder<L, S>| AutoLineDitherCounter {
+        let mut weights: <Sl as Slice<'_>>::Map<'_, AutoLineDitherCounter<'_, I, L, S>> =
+            weights.map(|counter: &MapBuilder<I, L, S>| AutoLineDitherCounter {
                 color: counter,
                 weight: S::ZERO,
             });
@@ -145,7 +145,7 @@ impl<S> DerefMut for Group<S> {
     }
 }
 
-struct AutoLineDitherCounter<'a, L, S> {
-    color: &'a MapBuilder<L, S>,
+struct AutoLineDitherCounter<'a,I,  L, S> {
+    color: &'a MapBuilder<I, L, S>,
     weight: S,
 }
