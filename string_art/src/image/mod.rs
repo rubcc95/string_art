@@ -1,4 +1,4 @@
-use crate::{color::Rgb, geometry::Point, Float, Grid};
+use crate::{color::Rgb, geometry::{Point, Rect}, Float};
 use image::{DynamicImage, GenericImageView, Rgb32FImage, RgbImage, Rgba32FImage, RgbaImage};
 use num_traits::AsPrimitive;
 use std::ops::Deref;
@@ -12,25 +12,25 @@ pub use blur::blur;
 #[derive(Clone)]
 pub struct PixelData<T> {
     pixels: Vec<T>,
-    grid: Grid,
+    rect: Rect,
 }
 
 impl<T> PixelData<T> {
-    pub unsafe fn from_raw(pixels: Vec<T>, grid: Grid) -> Self {
-        Self { pixels, grid }
+    pub unsafe fn from_raw(pixels: Vec<T>, rect: Rect) -> Self {
+        Self { pixels, rect }
     }
 
-    pub fn new(mut builder: impl FnMut(Point<usize>) -> T, grid: Grid) -> Self {
-        let mut pixels = Vec::with_capacity(grid.width * grid.height);
+    pub fn new(mut builder: impl FnMut(Point<usize>) -> T, rect: Rect) -> Self {
+        let mut pixels = Vec::with_capacity(rect.width * rect.height);
         unsafe { pixels.set_len(pixels.capacity()) };
         let ptr: *mut T = pixels.as_mut_ptr();
-        for x in 0..grid.width {
-            for y in 0..grid.height {
+        for x in 0..rect.width {
+            for y in 0..rect.height {
                 let p = Point { x, y };
-                unsafe { core::ptr::write(ptr.add(grid.index_of_unchecked(p)), builder(p)) };
+                unsafe { core::ptr::write(ptr.add(rect.index_of_unchecked(p)), builder(p)) };
             }
         }
-        Self { pixels, grid }
+        Self { pixels, rect }
     }
     pub fn pixels(&self) -> &[T] {
         &self.pixels
@@ -56,16 +56,16 @@ impl<T> PixelData<T> {
         index.get_unchecked_mut(self)
     }
 
-    pub fn grid(&self) -> &Grid {
-        &self.grid
+    pub fn rect(&self) -> &Rect {
+        &self.rect
     }
 }
 
 impl<T> Deref for PixelData<T> {
-    type Target = Grid;
+    type Target = Rect;
 
     fn deref(&self) -> &Self::Target {
-        &self.grid
+        &self.rect
     }
 }
 
@@ -87,7 +87,7 @@ where
                     )
                 })
                 .collect(),
-            grid: Grid {
+            rect: Rect {
                 height: value.height() as usize,
                 width: value.width() as usize,
             },
@@ -105,7 +105,7 @@ where
                 .pixels()
                 .map(|pixel| Rgb(pixel.0[0].as_(), pixel.0[1].as_(), pixel.0[2].as_()))
                 .collect(),
-            grid: Grid {
+            rect: Rect {
                 height: value.height() as usize,
                 width: value.width() as usize,
             },
@@ -123,7 +123,7 @@ where
                 .pixels()
                 .map(|pixel| Rgb(pixel.0[0].as_(), pixel.0[1].as_(), pixel.0[2].as_()))
                 .collect(),
-            grid: Grid {
+            rect: Rect {
                 height: value.height() as usize,
                 width: value.width() as usize,
             },
@@ -141,7 +141,7 @@ where
                 .pixels()
                 .map(|pixel| Rgb(pixel.0[0].as_(), pixel.0[1].as_(), pixel.0[2].as_()))
                 .collect(),
-            grid: Grid {
+            rect: Rect {
                 height: value.height() as usize,
                 width: value.width() as usize,
             },
@@ -159,7 +159,7 @@ where
                 .pixels()
                 .map(|pixel| Rgb(pixel.0[0].as_(), pixel.0[1].as_(), pixel.0[2].as_()))
                 .collect(),
-            grid: Grid {
+            rect: Rect {
                 height: value.height() as usize,
                 width: value.width() as usize,
             },

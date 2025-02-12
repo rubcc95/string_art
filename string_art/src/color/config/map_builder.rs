@@ -1,6 +1,5 @@
 use std::ops::{Deref, DerefMut};
-
-use num_traits::{AsPrimitive};
+use num_traits::AsPrimitive;
 
 use crate::{
     color::{AsRgb, Map, Rgb},
@@ -9,25 +8,25 @@ use crate::{
     Float,
 };
 
-pub struct Builder<L, S> {
-    map: Map<L, S>,
+pub struct Builder<I, L, S> {
+    map: Map<I, L, S>,
     rgb: Rgb<S>,
     pub(crate) count: usize,
 }
 
-impl<L, S> From<Builder<L, S>> for Map<L, S> {
+impl<I, L, S> From<Builder<I, L, S>> for Map<I, L, S> {
     #[inline]
-    fn from(weights: Builder<L, S>) -> Self {
+    fn from(weights: Builder<I, L, S>) -> Self {
         weights.map
     }
 }
 
-impl<L, S: Float> From<Map<L, S>> for Builder<L, S>
+impl<I, L, S: Float> From<Map<I, L, S>> for Builder<I, L, S>
 where
     u8: AsPrimitive<S>,
 {
     #[inline]
-    fn from(map: Map<L, S>) -> Self {
+    fn from(map: Map<I, L, S>) -> Self {
         Self {
             count: 0,
             rgb: map.as_rgb(),
@@ -36,8 +35,8 @@ where
     }
 }
 
-impl<L, S> Deref for Builder<L, S> {
-    type Target = Map<L, S>;
+impl<I, L, S> Deref for Builder<I, L, S> {
+    type Target = Map<I, L, S>;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
@@ -45,21 +44,21 @@ impl<L, S> Deref for Builder<L, S> {
     }
 }
 
-impl<L, S> DerefMut for Builder<L, S> {
+impl<I, L, S> DerefMut for Builder<I, L, S> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.map
     }
 }
 
-impl<L, S> Builder<L, S> {
+impl<I, L, S> Builder<I, L, S> {
     #[inline]
     pub fn color_normalized(&self) -> &Rgb<S> {
         &self.rgb
     }
 }
 
-impl<L, S: Float> Builder<L, S> {
+impl<I, L, S: Float> Builder<I, L, S> {
     #[inline]
     pub unsafe fn compute(&mut self, image: &Image<S>, contrast: S, blur_radius: usize)
     where
@@ -89,9 +88,9 @@ impl<S: Float> GrayScale<S> {
     const WHITE: Rgb<S> = Rgb(S::ONE, S::ONE, S::ONE);
 }
 
-impl<'a, L: 'a, S: Float> dither::Palette<'a, S> for Builder<L, S> {
+impl<'a, I, L: 'a, S: Float> dither::Palette<'a, S> for Builder<I, L, S> {
     type Color<'u>
-        = SingleDitherUnit<'u, L, S>
+        = SingleDitherUnit<'u, I, L, S>
     where
         Self: 'u,
         'a: 'u;
@@ -116,12 +115,12 @@ impl<'a, L: 'a, S: Float> dither::Palette<'a, S> for Builder<L, S> {
     }
 }
 
-pub struct SingleDitherUnit<'a, L, S> {
+pub struct SingleDitherUnit<'a, I, L, S> {
     color: Rgb<S>,
-    weight: Option<&'a mut Builder<L, S>>,
+    weight: Option<&'a mut Builder<I, L, S>>,
 }
 
-impl<'a, L, S: Float> dither::Color<S> for SingleDitherUnit<'a, L, S> {
+impl<'a, I, L, S: Float> dither::Color<S> for SingleDitherUnit<'a, I, L, S> {
     #[inline]
     fn color(&self) -> Rgb<S> {
         self.color
@@ -148,11 +147,11 @@ impl<T: ?Sized> UnsafeDitherPalette<T> {
     }
 }
 
-impl<'a, T: ?Sized + Slice<'a, Item = Builder<L, S>>, L: 'a, S: Float> dither::Palette<'a, S>
-    for UnsafeDitherPalette<T>
+impl<'a, T: ?Sized + Slice<'a, Item = Builder<I, L, S>>, I: 'a, L: 'a, S: Float>
+    dither::Palette<'a, S> for UnsafeDitherPalette<T>
 {
     type Color<'u>
-        = &'u mut Builder<L, S>
+        = &'u mut Builder<I, L, S>
     where
         'a: 'u,
         Self: 'u;
@@ -167,7 +166,7 @@ impl<'a, T: ?Sized + Slice<'a, Item = Builder<L, S>>, L: 'a, S: Float> dither::P
     }
 }
 
-impl<'a, L, S: Float> dither::Color<S> for &mut Builder<L, S> {
+impl<'a, I, L, S: Float> dither::Color<S> for &mut Builder<I, L, S> {
     #[inline]
     fn color(&self) -> Rgb<S> {
         *self.color_normalized()

@@ -1,29 +1,24 @@
-use crate::{
-    color,
-    image::Image,
-    slice::SliceOwner,
-};
+use crate::{color, image::Image, slice::SliceOwner, NailTable};
 
-pub mod single;
-pub mod multi;
 mod map_builder;
+pub mod multi;
+pub mod single;
 
-pub trait Config<'a, L: 'a, S: 'a> {
-    type Handle: Handle<'a, L, S>;
+pub trait Config<'a, S: 'a> {
+    type Handle<I: 'a, L: 'a>: Handle<'a, I, L, S>;
     type Error: core::error::Error;
 
-    fn into_color_handle(
+    fn into_color_handle<I: 'a + Default, L: 'a + Default>(
         self,
         image: &Image<S>,
-        nail_count: usize,
         blur_radius: usize,
         contrast: S,
-    ) -> Result<Self::Handle, Self::Error>;
+    ) -> Result<Self::Handle<I, L>, Self::Error>;
 }
 
 //SAFETY: Must ensure that select_next index is always < colors().len()
-pub unsafe trait Handle<'a, L: 'a, S: 'a> {
-    type Owner: SliceOwner<'a, Item = color::Map<L, S>>;
+pub unsafe trait Handle<'a, I: 'a, L: 'a, S: 'a> {
+    type Owner: SliceOwner<'a, Item = color::Map<I, L, S>>;
 
     fn select_next(&mut self) -> Option<usize>;
 

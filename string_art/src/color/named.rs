@@ -20,8 +20,8 @@ impl<S> Named<S> {
     }
 }
 
-impl<L, S> From<mapping::State<L, S>> for Named<S> {
-    fn from(value: mapping::State<L, S>) -> Self {
+impl<I, L, S> From<mapping::State<I, L, S>> for Named<S> {
+    fn from(value: mapping::State<I, L, S>) -> Self {
         value.color
     }
 }

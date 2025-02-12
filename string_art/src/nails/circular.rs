@@ -103,7 +103,11 @@ impl IntoIterator for CircularLinks {
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Direction(circle::Direction);
 
+impl Direction{
+    pub const CLOCK_WISE: Self = Direction(circle::Direction::ClockWise);
 
+    pub const COUNTER_CLOCK_WISE: Self = Direction(circle::Direction::CounterClockWise);
+}
 
 impl core::fmt::Display for Direction {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

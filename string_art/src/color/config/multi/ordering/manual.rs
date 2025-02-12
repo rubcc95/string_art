@@ -91,7 +91,7 @@ where
 {
     type Groups = G::Map<'a, super::Group<C::Map<'a, super::Item>>>;
 
-    fn build_handle<L, Sl: ?Sized + Slice<'a, Item = MapBuilder<L, S>>>(
+    fn build_handle<I, L, Sl: ?Sized + Slice<'a, Item = MapBuilder<I, L, S>>>(
         self,
         _: &Image<S>,
         weights: &Sl,

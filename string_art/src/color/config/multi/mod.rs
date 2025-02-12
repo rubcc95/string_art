@@ -1,20 +1,19 @@
 use num_traits::AsPrimitive;
 
+use super::map_builder::{Builder as MapBuilder, UnsafeDitherPalette};
 use crate::{
     color::{self, mapping},
     image::{self, Image},
     slice::{Slice, SliceOwner},
-    verboser, Float,
+    verboser, Float, NailTable,
 };
-use super::map_builder::{Builder as MapBuilder, UnsafeDitherPalette};
 
 pub mod ordering;
 
 pub use ordering::auto;
+pub use ordering::auto::Auto;
 pub use ordering::manual;
-pub use ordering::auto::Auto as Auto;
-pub use ordering::manual::Manual as Manual;
-
+pub use ordering::manual::Manual;
 
 pub struct Config<C, B> {
     colors: C,
@@ -28,37 +27,30 @@ impl<C, B> Config<C, B> {
     }
 }
 
-impl<'a, C: 'a, B, I: 'a, L: 'a, S> super::Config<'a, L, S> for Config<C, B>
+impl<'a, C: 'a, B, It: 'a, S> super::Config<'a, S> for Config<C, B>
 where
-    C: SliceOwner<'a, Item = mapping::State<L>>,
-    B: ordering::Builder<'a, S, Groups: SliceOwner<'a, Item = ordering::Group<I>>>,
-    I: SliceOwner<'a, Item = ordering::Item>,
+    C: SliceOwner<'a, Item = color::Named>,
+    B: ordering::Builder<'a, S, Groups: SliceOwner<'a, Item = ordering::Group<It>>>,
+    It: SliceOwner<'a, Item = ordering::Item>,
     S: Float,
     u8: AsPrimitive<S>,
     usize: AsPrimitive<S>,
 {
     type Error = Error;
-    type Handle = Handle<
-        <C::Map<'a, MapBuilder<L, S>> as SliceOwner<'a>>::Map<'a, color::Map<L, S>>,
+    type Handle<Id: 'a, L: 'a> = Handle<
+        <C::Map<'a, MapBuilder<Id, L, S>> as SliceOwner<'a>>::Map<'a, color::Map<Id, L, S>>,
         B::Groups,
     >;
 
-    fn into_color_handle(
+    fn into_color_handle<Id: 'a + Default, L: 'a + Default>(
         self,
         image: &Image<S>,
-        nail_count: usize,
         blur_radius: usize,
         contrast: S,
-    ) -> Result<Self::Handle, Self::Error> {
-        let mut weights = self.colors.try_map(|color| {
-            if nail_count > color.nail {
-                Ok(MapBuilder::from(color::Map::new(image, color)))
-            } else {
-                Err(Error::NailIndexOutOfRange(
-                    super::NailIndexOutOfRangeError,
-                ))
-            }
-        })?;
+    ) -> Result<Self::Handle<Id, L>, Self::Error> {
+        let mut weights = self
+            .colors
+            .map(|color| MapBuilder::from(color::Map::new(image, color.into())));
         let mut ditherer = image::Dither::floyd_steinberg();
         ditherer
             .dither(
@@ -90,11 +82,11 @@ pub struct Handle<C, G> {
     ordering: ordering::Config<G>,
 }
 
-unsafe impl<'a, C, G, I: 'a, L: 'a, S: 'a> super::Handle<'a, L, S> for Handle<C, G>
+unsafe impl<'a, C, G, It: 'a, Id: 'a, L: 'a, S: 'a> super::Handle<'a, Id, L, S> for Handle<C, G>
 where
-    C: SliceOwner<'a, Item = color::Map<L, S>>,
-    G: SliceOwner<'a, Item = ordering::Group<I>>,
-    I: SliceOwner<'a, Item = ordering::Item>,
+    C: SliceOwner<'a, Item = color::Map<Id, L, S>>,
+    G: SliceOwner<'a, Item = ordering::Group<It>>,
+    It: SliceOwner<'a, Item = ordering::Item>,
 {
     type Owner = C;
 
@@ -118,7 +110,6 @@ where
         self.colors.as_mut_slice()
     }
 }
-
 
 #[derive(Debug, thiserror::Error)]
 #[error(transparent)]
