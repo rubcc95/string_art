@@ -2,10 +2,10 @@ use num_traits::AsPrimitive;
 
 use super::map_builder::{Builder as MapBuilder, UnsafeDitherPalette};
 use crate::{
-    color::{self, mapping},
+    color::{self},
     image::{self, Image},
     slice::{Slice, SliceOwner},
-    verboser, Float, NailTable,
+    verboser, Float,
 };
 
 pub mod ordering;

@@ -4,7 +4,6 @@ use num_traits::AsPrimitive;
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
 use std::{
-    fmt::Display,
     num::NonZero,
     ops::{Deref, DerefMut},
 };

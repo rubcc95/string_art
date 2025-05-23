@@ -1,4 +1,4 @@
-use crate::{color, image::Image, slice::SliceOwner, NailTable};
+use crate::{color, image::Image, slice::SliceOwner};
 
 mod map_builder;
 pub mod multi;

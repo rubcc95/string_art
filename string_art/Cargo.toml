@@ -12,8 +12,10 @@ documentation = "https://docs.rs/string_art"
 bresenham = "0.1.1"
 image = { workspace = true }
 num-traits = { workspace = true }
-num_cpus = "1.16.0"
-rayon = { workspace = true }
 serde = { workspace = true }
 svg = { workspace = true }
 thiserror = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+num_cpus = "1.16.0"
+rayon = { workspace = true }
