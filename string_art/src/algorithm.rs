@@ -9,9 +9,7 @@ use crate::{
     verboser::{Message, Verboser},
     Float,
 };
-use image::imageops::ColorMap;
 use num_traits::AsPrimitive;
-use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 use std::ops::Range;
 
 pub fn compute<'a, N, B, P>(
@@ -247,6 +245,9 @@ where
     }
 
     fn get_best_line_for_idx(&mut self, color_idx: usize) -> NextLine<B::Id, N::Scalar, N::Link> {
+        #[cfg(not(target_arch = "wasm32"))]
+        use rayon::prelude::*;
+        
         struct SyncLineTable<B>(*mut B);
 
         impl<B: NailTable> SyncLineTable<B> {
@@ -264,8 +265,8 @@ where
             }
         }
 
+        #[cfg(not(target_arch = "wasm32"))]
         unsafe impl<S: Sync> Sync for SyncLineTable<S> {}
-        unsafe impl<S: Send> Send for SyncLineTable<S> {}
 
         let color_map = unsafe { self.color_maps.colors().get_unchecked(color_idx) };
 
@@ -274,9 +275,16 @@ where
         let chunk_size = (nail_count + self.buffers.len() - 1) / self.buffers.len();
         for (index, buffer) in self.buffers.iter_mut().enumerate() {
             let start = index * chunk_size;
-            buffer.range = start..nail_count.min(start + chunk_size);
+            buffer.range = start..Ord::min(nail_count, start + chunk_size);
         }
-        self.buffers.par_iter_mut().for_each(|buffer| {
+
+        #[cfg(not(target_arch = "wasm32"))]
+        let iter = self.buffers.par_iter_mut();
+        
+        #[cfg(target_arch = "wasm32")]
+        let iter = self.buffers.iter_mut();
+
+        iter.for_each(|buffer| {
             buffer.result = Default::default();
             for offset in buffer.range.clone() {
                 for to_link in N::LINKS {
@@ -361,9 +369,13 @@ struct BatchBuffer<I, S, L> {
 
 impl<I: Copy, S: Copy, L: Copy> BatchBuffer<I, S, L> {
     pub fn new() -> Vec<Self> {
+        #[cfg(not(target_arch = "wasm32"))]
+        let num_cpus = num_cpus::get().max(1);
+         #[cfg(target_arch = "wasm32")]
+        let num_cpus = 1;
         // SAFETY: Both structs will be initialized on get_best_line() before any read.
         // Since S and L are copy, BatchBuffer has not a relevant drop and it is safe to Drop it uninit.
-        let mut vec = Vec::with_capacity(num_cpus::get().max(1));
+        let mut vec = Vec::with_capacity(num_cpus);
         unsafe { vec.set_len(vec.capacity()) };
         vec
     }

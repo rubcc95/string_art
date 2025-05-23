@@ -2,9 +2,9 @@ use num_traits::AsPrimitive;
 
 use super::{map_builder::Builder as MapBuilder, NailIndexOutOfRangeError};
 use crate::{
-    color::{self, mapping},
+    color,
     image::{Dither, Image},
-    verboser, Float, NailTable,
+    verboser, Float,
 };
 
 pub struct SingleColorPalette {
