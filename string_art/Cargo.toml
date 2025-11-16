@@ -1,0 +1,27 @@
+[package]
+name = "string_art"
+version = "0.1.0"
+edition = "2024"
+
+
+[dependencies]
+string_art_sync = { path = "./string_art_sync", default-features = false }
+string_art_geometry = { path = "./string_art_geometry", default-features = false }
+string_art_color = { path = "./string_art_color", default-features = false}
+string_art_math = { path = "./string_art_math" }
+num-traits = { workspace = true }
+derive_more = { workspace = true }
+thiserror = { workspace = true }
+fixed = "^1.29"
+
+# Optional
+## Feature "image"
+image = { workspace = true, optional = true }
+
+## Feature "serde"
+serde = { workspace = true, optional = true }
+
+[features]
+default = ["image"]
+image = ["dep:image", "string_art_color/image"]
+serde = ["dep:serde", "string_art_geometry/serde"]

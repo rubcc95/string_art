@@ -1,0 +1,8 @@
+[package]
+name = "string_art_sync"
+version = "0.1.0"
+edition = "2024"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+rayon = { version = "^1.10" }
+num_cpus = { version = "^1.16" }

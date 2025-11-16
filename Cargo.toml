@@ -1,0 +1,34 @@
+[workspace]
+resolver = "2"
+members = [
+    "string_art",
+    "string_art/string_art_math",
+    "string_art/string_art_geometry",
+    "string_art/string_art_grid",
+    "string_art/string_art_color",
+    "string_art/string_art_sync",
+
+    "string_art_gui",
+    "string_art_gui/string_art_gui_common",
+    "string_art_gui/string_art_gui_web_worker",    
+    "string_art_gui/string_art_gui_web_worker_registrar", "xtask",
+]
+
+[workspace.dependencies]
+num-traits = "^0.2"
+thiserror = "^2.0"
+image = "^0.25"
+serde = { version = "^1.0", features = ["derive"] }
+derive_more = { version = "^2.0", features = ["deref", "deref_mut", "from"] }
+
+[profile]
+
+[profile.wasm-dev]
+inherits = "dev"
+opt-level = 1
+
+[profile.server-dev]
+inherits = "dev"
+
+[profile.android-dev]
+inherits = "dev"

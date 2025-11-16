@@ -1,0 +1,8 @@
+/target
+*.jpg
+*.png
+*.svg
+
+!*/example/*.jpg
+!*/example/*.png
+!*/example/*.svg

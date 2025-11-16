@@ -1,0 +1,20 @@
+[application]
+
+[web.app]
+#base_path = "/string_art/"
+title = "String Art"
+
+# include `assets` in web platform
+[web.resource]
+
+# Additional CSS style files
+style = []
+
+# Additional JavaScript files
+script = []
+
+[web.resource.dev]
+
+# Javascript code file
+# serve: [dev-server] only
+script = []
