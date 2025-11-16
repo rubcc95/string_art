@@ -1,0 +1,15 @@
+[package]
+name = "string_art_gui_common"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+derive_more = { workspace = true }
+image = { workspace = true }
+string_art = { path = "../../string_art" }
+serde = { workspace = true, optional = true }
+thiserror = {workspace = true }
+
+[features]
+default = []
+serde = ["dep:serde", "string_art/serde", "image/serde"]

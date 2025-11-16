@@ -1,0 +1,184 @@
+body,
+html {
+  background: #f9f9f9;
+  margin: 1rem;
+  height: 100%;
+  font-family: system-ui, sans-serif;
+}
+
+form {
+  width: 100%;
+  max-width: 100%;
+  /* <- Añade esto si no está */
+}
+
+.drop-zone-full {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1000;
+}
+
+/* Caja visible centrada */
+.drop-box {
+  position: absolute;
+  top: 2rem;
+  bottom: 2rem;
+  left: 2rem;
+  right: 2rem;
+
+  border: 2px dashed #aaa;
+  border-radius: 10px;
+  padding: 40px;
+  text-align: center;
+  color: #555;
+  background: white;
+  transition: background 0.3s ease;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Efecto al arrastrar encima */
+.drop-box.dragover {
+  background-color: #e0f7fa;
+  border-color: #26c6da;
+  color: #007c91;
+}
+
+.drop-box label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 100%;
+  height: 100%;
+
+  cursor: pointer;
+}
+
+.tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.tab {
+  background: #ceeaf1;
+  padding: 8px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  position: relative;
+}
+
+.tab.active {
+  background: #4876cc;
+  color: white;
+}
+
+.close-btn {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: #ff5252;
+  color: white;
+  border: none;
+  border-radius: 100%;
+  width: 18px;
+  height: 18px;
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.tab-content {
+  padding: 20px;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  min-height: 100px;
+}
+
+.flex {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.flex>* {
+  flex: 0 1 auto;
+  /* <- Deja crecer pero permite wrap */
+  max-width: 100%;
+  /* <- Imprescindible en Android */
+  min-width: 0;
+  /* <- Imprescindible para que Chrome no imponga tamaños mínimos */
+  box-sizing: border-box;
+  word-break: break-word;
+  /* <- Opcional, por si hay texto largo */
+}
+
+.form-group {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+svg {
+  width: 100%;
+  max-height: 80vh;
+}
+
+.form-group legend {
+  font-weight: 600;
+  padding: 0 0.5rem;
+}
+
+.padded {
+  padding: 0.4rem;
+}
+
+.small-input {
+  width: 70px;
+}
+
+.extent {
+  flex: 1;
+}
+
+input,
+select,
+.aaaa {
+  padding: 0.4rem;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.25rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1rem;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.progress-container {
+  flex: 1;
+  height: 20px;
+  background-color: #eee;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1rem;
+}
+
+.progress-bar {
+  height: 100%;
+  background-color: #26c6da;
+  transition: width 0.3s;
+}
