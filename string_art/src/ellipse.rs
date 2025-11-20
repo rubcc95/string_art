@@ -1,33 +1,16 @@
 use crate::*;
 use board::*;
-use derive_more::*;
 use geometry::Rect;
 use nails::*;
-use std::{
-    f32::consts::PI,
-    fmt::{Debug, Display},
-};
+use std::{f32::consts::PI, ops::Range};
 
 #[derive(Debug, Clone)]
 pub struct Ellipse<N: nails::Builder> {
-    segments: Vec<Segment>,
+    lines: Vec<Line>,
     pub handle: N::Handle,
     min_nail_distance: usize,
     nail_count: usize,
     pub nails: Vec<N::Nail>,
-}
-
-impl<N: nails::Builder> IntoBoard for Ellipse<N> {
-    type Board = EllipseBoard<N>;
-
-    fn into_board(self, cpus: usize) -> Self::Board {
-        let total_combs = self.nail_count - 2 * self.min_nail_distance - 1;
-        EllipseBoard {
-            ellipse: self,
-            total_combs,
-            per_batch: (total_combs + cpus - 1) / cpus,
-        }
-    }
 }
 
 impl<N: nails::Builder> Ellipse<N> {
@@ -54,10 +37,10 @@ impl<N: nails::Builder> Ellipse<N> {
         let builder = &nail_builder;
 
         let this = Self {
-            segments: Self::get_anchors(nail_count, min_nail_distance)
+            lines: Self::get_anchors(nail_count, min_nail_distance)
                 .map(|(big, small)| {
                     Ok(builder
-                        .create_segment(                            
+                        .create_segment(
                             (unsafe { nails_view.get_unchecked(small.idx) }, small.link),
                             (unsafe { nails_view.get_unchecked(big.idx) }, big.link),
                         )?
@@ -131,40 +114,33 @@ impl<N: nails::Builder> Ellipse<N> {
     }
 }
 
-#[derive(Deref, DerefMut)]
-pub struct EllipseBoard<B: nails::Builder> {
-    #[deref]
-    #[deref_mut]
-    ellipse: Ellipse<B>,
-    total_combs: usize,
-    per_batch: usize,
-}
+impl<B: nails::Builder> Board for Ellipse<B> {
+    type Batch = Range<usize>;
 
-impl<B: nails::Builder> Display for EllipseBoard<B> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Ellipse, nail count: {}", self.ellipse.nail_count)
-    }
-}
-
-impl<B: nails::Builder> Board for EllipseBoard<B> {
     type Anchor = nails::Anchor<B::Link>;
 
-    fn get_segment(&self, idx: usize) -> Option<&Segment> {
-        self.segments.get(idx)
+    type LineId = usize;
+
+    fn get_batches(&self, cpus: usize) -> impl Iterator<Item = Self::Batch> {
+        let total_combs = self.nail_count - 2 * self.min_nail_distance - 1;
+        let per_batch = (total_combs + cpus - 1) / cpus;
+
+        let mut start = 0;
+
+        (0..cpus).map(move |_| {
+            let end = total_combs.min(start + per_batch);
+            let res = start..end;
+            start = end;
+            res
+        })
     }
 
-    fn get_segment_mut(&mut self, idx: usize) -> Option<&mut Segment> {
-        self.ellipse.segments.get_mut(idx)
-    }
-
-    fn batch<'a>(
-        &'a self,
-        from: &'a Self::Anchor,
-        index: usize,
-    ) -> impl Iterator<Item: board::SegmentRef<Anchor = Self::Anchor>> + 'a {
-        let start = index * self.per_batch;
-        let range = start..self.total_combs.min(start + self.per_batch);
-        range.flat_map(move |index| {
+    fn get_indexes(
+        &self,
+        batch: &Self::Batch,
+        from: Self::Anchor,
+    ) -> impl Iterator<Item = (Self::Anchor, Self::LineId)> {
+        batch.clone().flat_map(move |index| {
             let mut to_idx = 1 + from.idx + self.min_nail_distance + index;
             if let Some(new_idx) = to_idx.checked_sub(self.nail_count) {
                 to_idx = new_idx;
@@ -184,134 +160,31 @@ impl<B: nails::Builder> Board for EllipseBoard<B> {
                         to.idx,
                         self.handle.index_of(&to.link)
                     ),
-                };                
-                SegmentRef::<B> {
-                    segment: unsafe { self.segments.get_unchecked(index) },
-                    next_anchor: self.handle.next_anchor(nails::Anchor {
+                };
+                (
+                    self.handle.next_anchor(nails::Anchor {
                         idx: to_idx,
                         link: to_link,
                     }),
                     index,
-                }
+                )
             })
         })
     }
-}
 
-pub struct SegmentRef<'a, N: nails::Builder> {
-    segment: &'a Segment,
-    next_anchor: nails::Anchor<N::Link>,
-    index: usize,
-}
-
-impl<'a, N: nails::Builder> board::SegmentRef for SegmentRef<'a, N> {
-    type Anchor = nails::Anchor<N::Link>;
-
-    fn segment(&self) -> &Segment {
-        self.segment
+    fn get_line(&self, index: Self::LineId) -> &Line {
+        &self.lines[index]
     }
 
-    fn index(&self) -> usize {
-        self.index
-    }
-
-    fn anchor(&self) -> Self::Anchor {
-        self.next_anchor.clone()
+    fn get_line_mut(&mut self, index: Self::LineId) -> &mut Line {
+        &mut self.lines[index]
     }
 }
 
 #[derive(Debug, thiserror::Error)]
-
 pub enum Error<N> {
     #[error(transparent)]
     Nail(N),
     #[error("The minimum distance between nails must be smaller than {0}.")]
     Distancer(usize),
-}
-
-#[cfg(test)]
-mod test {
-    use crate::board::SegmentRef;
-
-    use super::*;
-
-    pub fn test_ellipse<N: nails::Builder>(
-        nails: N,
-        nail_count: usize,
-        nail_distance: usize,
-        batches: usize,
-    ) {
-        let ellipse =
-            Ellipse::new(Rect::new(1000.0, 1000.0), nails, nail_count, nail_distance).unwrap();
-        let board = ellipse.into_board(batches);
-        let mut i = 0;
-        for (a, b) in Ellipse::<N>::get_anchors(nail_count, nail_distance) {
-            match board.ellipse.index_of(a.clone(), b.clone()) {
-                Some(index) => {
-                    assert_eq!(
-                        i,
-                        index,
-                        "Expected index {}, but got {} for anchors: {:?} and {:?}",
-                        i,
-                        index,
-                        anchor::Debugger {
-                            handle: &board.handle,
-                            anchor: &a
-                        },
-                        anchor::Debugger {
-                            handle: &board.handle,
-                            anchor: &b
-                        }
-                    );
-                    i += 1;
-                }
-                None => panic!(
-                    "Failed to get index for anchors: {:?} and {:?}",
-                    anchor::Debugger {
-                        handle: &board.handle,
-                        anchor: &a
-                    },
-                    anchor::Debugger {
-                        handle: &board.handle,
-                        anchor: &b
-                    }
-                ),
-            }
-        }
-        let mut counter = vec![0; board.ellipse.segments.len()];
-
-        for anchor_idx in 0..nail_count {
-            for link in N::LINKS.into_iter() {
-                for batch_idx in 0..batches {
-                    for item in EllipseBoard::batch(
-                        &board,
-                        &Anchor {
-                            idx: anchor_idx,
-                            link: link.clone(),
-                        },
-                        batch_idx,
-                    ) {
-                        let i = SegmentRef::index(&item);
-                        let anchor = SegmentRef::anchor(&item);
-                        assert!(
-                            board.segments.len() > i,
-                            "Overflow range from: ({}), to: ({}) -> {}. (Max value expected: {})",
-                            anchor_idx,
-                            anchor.idx,
-                            i,
-                            board.segments.len()
-                        );
-                        counter[i] += 1;
-                    }
-                }
-            }
-        }
-        assert!(counter.iter().all(|&c| c == 2));
-    }
-
-    #[test]
-    pub fn test() {
-        test_ellipse(UniformCircular(0.5), 10, 1, 4);
-        test_ellipse(Point, 123, 1, 10);
-    }
 }

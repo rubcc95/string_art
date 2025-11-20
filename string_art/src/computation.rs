@@ -1,245 +1,205 @@
-#![allow(type_alias_bounds)]
+use crate::{
+    Board, Pipeline, PipelineLayer, ValidPipelineLayer, ValidWeightMap, WeightMap,
+    board::ValidBoard, geometry::Segment, math::*,
+};
+use num_traits::SaturatingSub;
 
-use std::iter::FusedIterator;
+#[cfg(feature = "rayon")]
+use num_cpus::get as cpus;
 
-use crate::*;
-use board::*;
-use geometry::Rect;
-use math::*;
-use sync::*;
-
-pub trait Pipeline: Iterator<Item = Self::Index> {
-    type Anchor: CondSend + CondSync + Clone;
-    type Color: Clone;
-    type Index: Clone + Into<usize>;
-    type Scalar: Scalar;
-
-    fn color_map(&self, index: &Self::Index) -> &ColorMap<Self::Anchor, Self::Color, Frac<Self>>;
-
-    fn color_map_mut(
-        &mut self,
-        index: &Self::Index,
-    ) -> &mut ColorMap<Self::Anchor, Self::Color, Frac<Self>>;
-
-    fn color_maps(&self) -> &[ColorMap<Self::Anchor, Self::Color, Frac<Self>>];
-
-    fn color_maps_mut(&mut self) -> &mut [ColorMap<Self::Anchor, Self::Color, Frac<Self>>];
+#[cfg(not(feature = "rayon"))]
+pub const fn cpus() -> usize {
+    1
 }
 
-type Frac<P: Pipeline> = <P::Scalar as Scalar>::Frac;
-type Int<P: Pipeline> = <P::Scalar as Scalar>::Int;
-
-pub struct Computation<B, P: Pipeline, D> {
-    pipeline: P,
-    inner: Inner<B, P, D>,
+pub struct Computation<B: Board, P: Pipeline<Weight: Frac>> {
+    runtime: P::Runtime<B::Anchor>,
+    inner: BatchedBoard<B, P::Weight>,
+    decay: P::Weight,
 }
 
-#[derive(Debug, thiserror::Error)]
-#[error("The length of the color map buffer does not match the length of the rectangle area.")]
-pub struct RectAreaError;
-
-impl<'a, B, P: Pipeline, D> Computation<B, P, D> {
+impl<'a, B: Board, P: Pipeline<Weight: Frac>> Computation<B, P> {
     pub fn board(&self) -> &B {
         &self.inner.board
     }
 
-    pub fn rect(&self) -> &Rect<usize> {
-        &self.inner.rect
-    }
-
-    pub fn pipeline(&self) -> &P {
-        &self.pipeline
+    pub fn runtime(&self) -> &P::Runtime<B::Anchor> {
+        &self.runtime
     }
 }
 
-impl<'a, B, P, D> Computation<B, P, D>
+impl<B, P> Computation<B, P>
 where
-    B: Board,
-    P: Pipeline<Anchor = B::Anchor>,
-    D: decay::Fn<Frac<P>>,
+    B: ValidBoard,
+    for<'a> P: Pipeline<Weight: Frac, Layer<'a, B::Anchor>: ValidPipelineLayer>,
 {
-    pub fn new<T: IntoBoard<Board = B>>(
-        pipeline: P,
-        into_board: T,
-        rect: Rect<usize>,
-        decay: D,
-    ) -> Result<Self, RectAreaError> {
-        let mut this = Self {
-            pipeline,
-            inner: Inner {
-                board: into_board.into_board(cpus()),
-                rect: rect,
-                bufs: vec![None; cpus()],
-                decay,
-            },
+    pub fn new(pipeline: P, board: B, decay: P::Weight) -> Self {
+        let mut batched_board = BatchedBoard {
+            bufs: board.get_batches(cpus()).map(BatchBuffer::new).collect(),
+            board,
+            //rect: rect,
         };
-        let map_len = this.inner.rect.area();
-        for map in this.pipeline.color_maps_mut() {
-            if map.weights.len() != map_len {
-                return Err(RectAreaError);
-            }
-            if let Some(line) = this.inner.get_best_line(map) {
-                map.anchor = line.anchor;
-            }
+        Self {
+            runtime: pipeline.init(&mut batched_board),
+            inner: batched_board,
+            decay,
         }
-        Ok(this)
     }
 }
 
-impl<'a, B, P, D> Iterator for Computation<B, P, D>
+impl<B, P> Iterator for Computation<B, P>
 where
-    B: Board,
-    P: Pipeline<Anchor = B::Anchor>,
-    D: decay::Fn<Frac<P>>,
+    B: ValidBoard,
+    for<'a> P: Pipeline<Weight: Frac, Layer<'a, B::Anchor>: ValidPipelineLayer>,
 {
-    type Item = Result<Step<P>, Error>;
+    type Item = Step<P::MapId, B::Anchor>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.pipeline.next().and_then(|index| {
-            let map = self.pipeline.color_map_mut(&index);
-            self.inner.get_best_line(map).map(|line| {
-                let segment = match B::get_segment_mut(&mut self.inner.board, line.segment_idx) {
-                    Some(segment) => segment,
-                    None => return Err(Error),
-                };
-                segment.set_used();
-                let anchor = core::mem::replace(&mut map.anchor, line.anchor);
-                for point in self
-                    .inner
-                    .rect
-                    .get_pixel_indexes_in_segment(segment.get_segment())
-                {
-                    let weight = &mut map.weights[point];
-                    *weight = self.inner.decay.compute(*weight);
+        P::next(&mut self.runtime).and_then(|mut map| {
+            let anchor = *map.anchor();
+            self.inner.get_best_line(&map, anchor).map(|step_id| {
+                let line = self.inner.board.get_line_mut(step_id.line_id);
+                line.set_used();
+                let anchor = *map.anchor();
+                map.set_anchor(step_id.anchor);
+                let segment = line.segment();
+                for point in segment.floor().as_::<isize>().bresenham() {
+                    if let Some(point) = point.cast::<usize>() {
+                        if let Some(pixel) = map.get_mut(point) {
+                            *pixel = (*pixel).saturating_sub(&self.decay);
+                        }
+                    }
                 }
 
-                Ok(Step {
-                    color: index,
+                Step {
+                    layer: map.id(),
                     anchor,
-                    segment: *segment.get_segment(),
-                })
+                    segment: *segment,
+                }
             })
         })
     }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.pipeline.size_hint()
-    }
-}
-
-impl<'a, B, P, D> ExactSizeIterator for Computation<B, P, D>
-where
-    B: Board,
-    P: Pipeline<Anchor = B::Anchor> + ExactSizeIterator,
-    D: decay::Fn<Frac<P>>,
-{
-    fn len(&self) -> usize {
-        self.pipeline.len()
-    }
-}
-
-impl<'a, B, P, D> FusedIterator for Computation<B, P, D>
-where
-    B: Board,
-    P: Pipeline<Anchor = B::Anchor> + FusedIterator,
-    D: decay::Fn<Frac<P>>,
-{
 }
 
 #[derive(Debug, thiserror::Error)]
 #[error("Computation error")]
 pub struct Error;
 
-struct Inner<B, P: Pipeline, D> {
+pub struct BatchedBoard<B: Board, F: Frac> {
     board: B,
-    decay: D,
-    rect: Rect<usize>,
-    bufs: Vec<Option<NextLineWeighted<P::Anchor, P::Scalar>>>,
+    bufs: Vec<BatchBuffer<B, F::Fixed>>,
 }
 
-impl<'a, B, P, D> Inner<B, P, D>
+impl<'a, B, F> BatchedBoard<B, F>
 where
-    B: Board,
-    P: Pipeline<Anchor = B::Anchor>,
-    D: decay::Fn<Frac<P>>,
+    B: ValidBoard,
+    F: Frac,
 {
-    fn get_best_line(
+    pub fn get_best_line(
         &mut self,
-        map: &mut ColorMap<P::Anchor, P::Color, Frac<P>>,
-    ) -> Option<NextLine<B::Anchor>> {
-        for_each(&mut self.bufs, |i, next_line| {
-            *next_line = None;
-            for segment in self.board.batch(&map.anchor, i) {
-                let board_segment = segment.segment();
+        map: &impl ValidWeightMap<Weight = F>,
+        anchor: B::Anchor,
+    ) -> Option<StepId<B::LineId, B::Anchor>> {
+        #[cfg(not(feature = "rayon"))]
+        for buffer in &mut self.bufs {
+            buffer.get_best_line(&self.board, map, anchor);
+        }
 
-                if board_segment.is_used() {
-                    continue;
-                }
+        #[cfg(feature = "rayon")]
+        {
+            use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
-                let weight = {
-                    let mut count = Int::<P>::ZERO;
-                    let mut weight = P::Scalar::ZERO;
-                    for idx in self.rect.get_pixel_indexes_in_segment(board_segment) {
-                        let delta = &map.weights[idx];
-                        count = count + Int::<P>::ONE;
-                        weight += <P::Scalar as Scalar>::from_frac(*delta);
-                    }
-                    if count > Int::<P>::ZERO {
-                        weight / P::Scalar::from_int(count)
-                    } else {
-                        P::Scalar::ZERO
-                    }
-                };
+            self.bufs
+                .par_iter_mut()
+                .for_each(|buffer| buffer.get_best_line(&self.board, map, anchor));
+        }
 
-                if match next_line {
-                    Some(next_line) => weight > next_line.weight,
-                    None => true,
-                } {
-                    *next_line = Some(NextLineWeighted {
-                        weight,
-                        next: NextLine {
-                            segment_idx: segment.index(),
-                            anchor: segment.anchor(),
-                        },
-                    })
+        let mut bufs = self.bufs.iter();
+
+        bufs.next().and_then(|mut best| {
+            for buf in bufs {
+                if buf.weight > best.weight {
+                    best = buf;
                 }
             }
-        });
-
-        self.bufs
-            .iter_mut()
-            .filter_map(|a| a.take())
-            .max_by(|a, b| a.weight.cmp(&b.weight))
-            .map(|a| a.next)
+            best.step
+        })
     }
 }
 
 #[derive(Debug)]
-pub struct Step<P: Pipeline> {
-    pub color: P::Index,
-    pub anchor: P::Anchor,
-    pub segment: geometry::Segment<f32>,
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Step<L, A> {
+    pub layer: L,
+    pub anchor: A,
+    pub segment: Segment<f32>,
 }
 
-#[derive(Clone, Default)]
+#[derive(Default, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-struct NextLine<A> {
-    segment_idx: usize,
-    anchor: A,
+pub struct StepId<L, A> {
+    pub line_id: L,
+    pub anchor: A,
 }
 
 #[derive(Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-struct NextLineWeighted<A, S> {
-    next: NextLine<A>,
-    weight: S,
+struct BatchBuffer<B: Board, F> {
+    batch: B::Batch,
+    step: Option<StepId<B::LineId, B::Anchor>>,
+    weight: F,
 }
 
-impl<A: Default, S: Integer> Default for NextLineWeighted<A, S> {
-    fn default() -> Self {
+impl<B: Board, F: Scalar> BatchBuffer<B, F> {
+    fn new(batch: B::Batch) -> Self {
         Self {
-            next: Default::default(),
-            weight: S::ZERO,
+            batch,
+            step: None,
+            weight: F::ZERO,
+        }
+    }
+}
+
+impl<B: Board, F: Fixed> BatchBuffer<B, F> {
+    fn get_best_line(
+        &mut self,
+        board: &B,
+        map: &impl WeightMap<Weight = F::Frac>,
+        anchor: B::Anchor,
+    ) {
+        self.step = None;
+        self.weight = F::ZERO;
+
+        for (anchor, line_id) in board.get_indexes(&self.batch, anchor) {
+            let line = board.get_line(line_id);
+
+            if line.is_used() {
+                continue;
+            }
+
+            let segment = line.segment();
+
+            let weight = {
+                let mut count = F::Int::ZERO;
+                let mut weight = F::ZERO;
+                for point in segment.floor().as_::<isize>().bresenham() {
+                    if let Some(point) = point.cast::<usize>() {
+                        if let Some(&delta) = map.get(point) {
+                            count = count + F::Int::ONE;
+                            weight += F::from_frac(delta);
+                        }
+                    }
+                }
+                if count > F::Int::ZERO {
+                    weight / F::from_int(count)
+                } else {
+                    F::ZERO
+                }
+            };
+
+            if weight > self.weight {
+                self.weight = weight;
+                self.step = Some(StepId { line_id, anchor });
+            }
         }
     }
 }

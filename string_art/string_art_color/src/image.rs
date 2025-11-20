@@ -1,15 +1,14 @@
 use derive_more::*;
 use string_art_grid::Grid;
 
-
 #[derive(Clone, Debug, Deref, DerefMut, From)]
 pub struct Image<C = (f32, f32, f32)>(pub Grid<C>);
 
 #[cfg(feature = "image")]
 mod from_image {
-    use super::*;    
-    use string_art_geometry::Rect;
+    use super::*;
     use image::*;
+    use string_art_geometry::Rect;
 
     impl From<DynamicImage> for Image {
         fn from(value: DynamicImage) -> Self {
@@ -22,7 +21,7 @@ mod from_image {
                             (r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0)
                         })
                         .collect(),
-                    Rect::new(value.height() as usize, value.width() as usize),
+                    Rect::new(value.width() as usize, value.height() as usize),
                 )
             })
         }
@@ -39,7 +38,7 @@ mod from_image {
                             (r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0)
                         })
                         .collect(),
-                    Rect::new(value.height() as usize, value.width() as usize),
+                    Rect::new(value.width() as usize, value.height() as usize),
                 )
             })
         }
@@ -56,7 +55,7 @@ mod from_image {
                             (r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0)
                         })
                         .collect(),
-                    Rect::new(value.height() as usize, value.width() as usize),
+                    Rect::new(value.width() as usize, value.height() as usize),
                 )
             })
         }
@@ -67,7 +66,7 @@ mod from_image {
             Self(unsafe {
                 Grid::from_raw(
                     value.pixels().map(|pixel| pixel.0.into()).collect(),
-                    Rect::new(value.height() as usize, value.width() as usize),
+                    Rect::new(value.width() as usize, value.height() as usize),
                 )
             })
         }
@@ -84,7 +83,7 @@ mod from_image {
                             (r, g, b)
                         })
                         .collect(),
-                    Rect::new(value.height() as usize, value.width() as usize),
+                    Rect::new(value.width() as usize, value.height() as usize),
                 )
             })
         }

@@ -6,15 +6,14 @@ pub use anchor::Anchor;
 pub use circular::UniformCircular;
 pub use point::Point;
 
-use crate::sync::*;
 use crate::geometry;
-
+//use crate::sync::*;
 
 pub trait Builder {
-    type Nail: CondSync;
+    type Nail;
     type Links: Links<Link = Self::Link>;
     type Handle: Handle<Link = Self::Link, Nail = Self::Nail>;
-    type Link: Clone + CondSync + CondSend + Default;
+    type Link: Copy + Default;
     type Error: std::error::Error;
 
     const LINKS: Self::Links;
@@ -37,8 +36,8 @@ pub unsafe trait Links: IntoIterator<Item = Self::Link> {
     const SQ_LEN: usize = Self::LEN * Self::LEN;
 }
 
-pub trait Handle: CondSync {
-    type Nail: CondSync;
+pub trait Handle {
+    type Nail;
     type Link: Default;
 
     fn next_anchor(&self, anchor: Anchor<Self::Link>) -> Anchor<Self::Link>;
