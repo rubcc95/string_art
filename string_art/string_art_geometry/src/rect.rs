@@ -2,16 +2,16 @@ use crate::{Point, Segment};
 use num_traits::*;
 use std::ops::*;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq,)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Rect<T> {
-    pub height: T,
     pub width: T,
+    pub height: T,
 }
 
 impl<T> Rect<T> {
-    pub fn new(height: T, width: T) -> Self {
-        Self { height, width }
+    pub fn new(width: T, height: T) -> Self {
+        Self { width, height }
     }
 }
 
@@ -35,8 +35,7 @@ impl<T> From<Rect<T>> for Point<T> {
 
 impl<S: NumCast> Rect<S> {
     pub fn cast<I: NumCast>(self) -> Option<Rect<I>> {
-        cast(self.width)
-            .and_then(|width| cast(self.height).map(|height| Rect { width, height }))
+        cast(self.width).and_then(|width| cast(self.height).map(|height| Rect { width, height }))
     }
 }
 
@@ -59,24 +58,23 @@ impl<T: Mul + Clone> Rect<T> {
 }
 
 impl<T: NumCast + Unsigned + PartialOrd + Copy> Rect<T> {
-    pub fn get_pixel_indexes_in_segment<F: Float+ std::fmt::Debug  + 'static>(
+    pub fn get_pixel_indexes_in_segment<F: Float + std::fmt::Debug + 'static>(
         &self,
         seg: &Segment<F>,
     ) -> impl Iterator<Item = T>
     where
         usize: AsPrimitive<F>,
     {
-        self.bresenham(seg)
-            .filter_map(|point| self.index_of(point))
+        self.bresenham(seg).filter_map(|point| self.index_of(point))
     }
 
     pub fn bresenham<F: Float + std::fmt::Debug + 'static>(
         &self,
         seg: &Segment<F>,
     ) -> impl Iterator<Item = Point<T>> + use<F, T> {
-        let segment = seg.floor(); 
+        let segment = seg.floor();
         let casted = segment.cast::<isize>();
-        let casted = match casted{
+        let casted = match casted {
             Some(casted) => casted,
             None => panic!("{segment:?} is not castable"),
         };

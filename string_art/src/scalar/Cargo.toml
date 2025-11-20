@@ -1,0 +1,9 @@
+[package]
+name = "scalar"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+derive_more = { workspace = true }
+fixed = { version = "^1.29", features = ["num-traits"] }
+num-traits.workspace = true

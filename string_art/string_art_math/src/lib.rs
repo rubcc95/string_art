@@ -1,152 +1,121 @@
+use num_traits::{NumAssignOps, NumOps, SaturatingSub};
 
-use num_traits::*;
-use fixed::types::*;
-use std::fmt::*;
+pub type Fixed16 = fixed::types::U8F8;
+pub type Fixed32 = fixed::types::U16F16;
+pub type Fixed64 = fixed::types::U32F32;
+pub type Fixed128 = fixed::types::U64F64;
 
-pub use fixed::traits::{Fixed, ToFixed};
-pub use num_traits::ConstOne as _;
-pub use num_traits::ConstZero as _;
+pub type Frac8 = fixed::types::U0F8;
+pub type Frac16 = fixed::types::U0F16;
+pub type Frac32 = fixed::types::U0F32;
+pub type Frac64 = fixed::types::U0F64;
 
-pub type Frac8 = U0F8;
-pub type Frac16 = U0F16;
-pub type Frac32 = U0F32;
-pub type Frac64 = U0F64;
-pub type Scalar8 = U24F8;
-pub type Scalar16 = U16F16;
-pub type Scalar32 = U32F32;
-pub type Scalar64 = U64F64;
-
-mod convert;
-pub use convert::*;
-
-pub trait Frac
+pub trait Scalar
 where
-    Self: Copy + Eq + Ord,
-    Self: Send + Sync + 'static,
-    Self: NumAssignOps + NumOps + ConstZero,
-    Self: Debug + Display,
+    Self: PartialOrd,
+    Self: NumOps + NumAssignOps,
+    Self: Copy + Send + Sync + 'static,
 {
+    const ZERO: Self;
 }
 
-impl<T> Frac for T
-where
-    T: Copy + Eq + Ord,
-    T: Send + Sync + 'static,
-    T: NumAssignOps + NumOps + ConstZero,
-    T: Debug + Display,
-{
+macro_rules! scalar_impl {
+        ($($t:ty),+; $zero:expr) => {
+            $(
+                impl Scalar for $t {
+                    const ZERO: Self = $zero;
+                }
+            )+
+        };
+    }
+
+scalar_impl!(u8, u16, u32, u64, u128, i8, i16, i32, i64, i128; 0);
+scalar_impl!(f32, f64; 0.0);
+scalar_impl!(Fixed16, Fixed32, Fixed64, Fixed128, Frac8, Frac16, Frac32, Frac64; Self::ZERO);
+
+pub trait Integer: Scalar + Ord {
+    const ONE: Self;
 }
 
-pub trait Integer: Frac + ConstOne {}
+macro_rules! integer_impl {
+        ($($t:ty),+; $one:expr) => {
+            $(
+                impl Integer for $t {
+                    const ONE: Self = $one;
+                }
+            )+
+        };
+    }
 
-impl<T> Integer for T where T: Frac + ConstOne {}
+integer_impl!(u8, u16, u32, u64, u128, i8, i16, i32, i64, i128; 1);
 
-pub trait Scalar: Integer {
+pub trait Frac: Scalar + Ord + SaturatingSub {
+    type Bits: Integer;
+    type Fixed: Fixed<Frac = Self>;
+
+    fn from_bits(bits: Self::Bits) -> Self;
+
+    fn to_bits(self) -> Self::Bits;
+}
+
+macro_rules! frac_impl {
+    ($U:ty, $Bits:ty, $Fixed:ty) => {
+        impl Frac for $U {
+            type Bits = $Bits;
+            type Fixed = $Fixed;
+
+            fn from_bits(bits: Self::Bits) -> Self {
+                <$U>::from_bits(bits)
+            }
+
+            fn to_bits(self) -> Self::Bits {
+                self.to_bits()
+            }
+        }
+    };
+}
+
+frac_impl!(Frac8, u8, Fixed16);
+frac_impl!(Frac16, u16, Fixed32);
+frac_impl!(Frac32, u32, Fixed64);
+frac_impl!(Frac64, u64, Fixed128);
+
+pub trait Fixed: Scalar + Ord {
+    type Int: Integer;
     type Frac: Frac;
 
-    type Int: Integer;
-
-    fn from_frac(frac: Self::Frac) -> Self;
-
     fn from_int(int: Self::Int) -> Self;
-
-    fn frac(&self) -> Self::Frac;
-
-    fn int(&self) -> Self::Int;
+    fn from_frac(frac: Self::Frac) -> Self;
+    fn int(self) -> Self::Int;
+    fn frac(self) -> Self::Frac;
 }
 
-impl Scalar for Scalar8 {
-    type Frac = Frac8;
+macro_rules! impl_fixed {
+    ($Fixed:ident, $Bits:ty, $Int:ty, $Frac:ty) => {
+        impl Fixed for $Fixed {
+            type Int = $Int;
+            type Frac = $Frac;
 
-    type Int = u32;
+            fn from_int(int: Self::Int) -> Self {
+                $Fixed::from_bits((int as $Bits) << <$Int>::BITS)
+            }
 
-    fn from_frac(frac: Self::Frac) -> Self {
-        U24F8::from_bits(frac.to_bits() as u32)
-    }
+            fn from_frac(frac: Self::Frac) -> Self {
+                Self::from_bits(frac.to_bits() as _)
+            }
 
-    fn from_int(int: Self::Int) -> Self {
-        U24F8::from_bits(int << 8)
-    }
+            fn int(self) -> Self::Int {
+                (self.to_bits() >> <$Int>::BITS) as $Int
+            }
 
-    fn frac(&self) -> Self::Frac {
-        let bits = self.to_bits();
-        U0F8::from_bits((bits & 0xFF) as u8)
-    }
-
-    fn int(&self) -> Self::Int {
-        let bits = self.to_bits();
-        (bits >> 8) as u32
-    }
+            fn frac(self) -> Self::Frac {
+                <$Frac>::from_bits(self.to_bits() as _)
+            }
+        }
+    };
 }
 
-impl Scalar for Scalar16 {
-    type Frac = Frac16;
-
-    type Int = u16;
-
-    fn from_frac(frac: Self::Frac) -> Self {
-        U16F16::from_bits(frac.to_bits() as u32)
-    }
-
-    fn from_int(int: Self::Int) -> Self {
-        U16F16::from_bits((int as u32) << 16)
-    }
-
-    fn frac(&self) -> Self::Frac {
-        let bits = self.to_bits();
-        U0F16::from_bits((bits & 0xFFFF) as u16)
-    }
-
-    fn int(&self) -> Self::Int {
-        let bits = self.to_bits();
-        (bits >> 16) as u16
-    }
-}
-
-impl Scalar for Scalar32 {
-    type Frac = Frac32;
-
-    type Int = u32;
-
-    fn from_frac(frac: Self::Frac) -> Self {
-        U32F32::from_bits(frac.to_bits() as u64)
-    }
-
-    fn from_int(int: Self::Int) -> Self {
-        U32F32::from_bits((int as u64) << 32)
-    }
-
-    fn frac(&self) -> Self::Frac {
-        let bits = self.to_bits();
-        U0F32::from_bits((bits & 0xFFFFFFFF) as u32)
-    }
-
-    fn int(&self) -> Self::Int {
-        let bits = self.to_bits();
-        (bits >> 8) as u32
-    }
-}
-
-impl Scalar for Scalar64 {
-    type Frac = Frac64;
-
-    type Int = u64;
-
-    fn from_frac(frac: Self::Frac) -> Self {
-        U64F64::from_bits(frac.to_bits() as u128)
-    }
-
-    fn from_int(int: Self::Int) -> Self {
-        U64F64::from_bits((int as u128) << 64)
-    }
-
-    fn frac(&self) -> Self::Frac {
-        let bits = self.to_bits();
-        U0F64::from_bits((bits & 0xFFFFFFFFFFFFFFFF) as u64)
-    }
-
-    fn int(&self) -> Self::Int {
-        let bits = self.to_bits();
-        (bits >> 8) as u64
-    }
-}
+impl_fixed!(Fixed16, u16, u8, Frac8);
+impl_fixed!(Fixed32, u32, u16, Frac16);
+impl_fixed!(Fixed64, u64, u32, Frac32);
+impl_fixed!(Fixed128, u128, u64, Frac64);

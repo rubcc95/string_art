@@ -1,0 +1,14 @@
+[package]
+name = "string_art_bindings"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+string_art = { path = "../string_art", default-features = false, features = ["serde", "image"] }
+serde.workspace = true
+wasm-bindgen = { version = "0.2.105", features = ["serde-serialize"] }
+serde-wasm-bindgen = "0.6.5"
+image.workspace = true

@@ -1,72 +1,110 @@
-
+use crate::geometry::Segment;
 use derive_more::Deref;
-use crate::sync::*;
 
-type Seg = crate::geometry::Segment<f32>;
+#[cfg(feature = "rayon")]
+mod multi_thread {
+    use super::Board;
 
-pub trait IntoBoard{
-    type Board: Board;
+    pub trait ValidBoard
+    where
+        Self: Sync,
+        Self: Board<Batch: Send + Sync>,
+        Self: Board<LineId: Send + Sync>,
+        Self: Board<Anchor: Send + Sync>,
+    {
+    }
 
-    fn into_board(self, cpus: usize) -> Self::Board;
+    impl<T: Board> ValidBoard for T
+    where
+        T: Sync,
+        T: Board<Batch: Send + Sync>,
+        T: Board<LineId: Send + Sync>,
+        T: Board<Anchor: Send + Sync>,
+    {
+    }
 }
 
-pub trait Board : CondSync{
-    type Anchor: Clone + Default + CondSend + CondSync;    
+#[cfg(not(feature = "rayon"))]
+pub use crate::Board as ValidBoard;
+#[cfg(feature = "rayon")]
+pub use multi_thread::ValidBoard;
 
-    fn batch<'a>(
-        &'a self,
-        anchor: &'a Self::Anchor,
-        index: usize,
-    ) -> impl Iterator<Item: SegmentRef<Anchor = Self::Anchor>> + 'a;
+pub trait Board {
+    type Batch;
+    type Anchor: Default + Copy;
+    type LineId: Copy;
 
-    fn get_segment(&self, idx: usize) -> Option<&Segment>;
+    fn get_batches(&self, cpus: usize) -> impl Iterator<Item = Self::Batch>;
 
-    fn get_segment_mut(&mut self, idx: usize) -> Option<&mut Segment>;
+    fn get_indexes(
+        &self,
+        batch: &Self::Batch,
+        id: Self::Anchor,
+    ) -> impl Iterator<Item = (Self::Anchor, Self::LineId)>;
+
+    fn get_line(&self, index: Self::LineId) -> &Line;
+
+    fn get_line_mut(&mut self, index: Self::LineId) -> &mut Line;
+
+    //fn get_anchor(&self, id: Self::AnchorId) -> Self::Anchor;
 }
 
-pub trait SegmentRef {
-    type Anchor;
+impl<B: Board> Board for &mut B {
+    type Batch = B::Batch;
+    type Anchor = B::Anchor;
+    type LineId = B::LineId;
 
-    fn segment(&self) -> &Segment;
+    fn get_batches(&self, cpus: usize) -> impl Iterator<Item = Self::Batch> {
+        B::get_batches(*self, cpus)
+    }
 
-    fn index(&self) -> usize;
+    fn get_indexes(
+        &self,
+        batch: &Self::Batch,
+        id: Self::Anchor,
+    ) -> impl Iterator<Item = (Self::Anchor, Self::LineId)> {
+        B::get_indexes(*self, batch, id)
+    }
 
-    fn anchor(&self) -> Self::Anchor;
-}
+    fn get_line(&self, index: Self::LineId) -> &Line {
+        B::get_line(*self, index)
+    }
 
-pub trait Batched {
-    type Anchor;
-    type Ref: SegmentRef<Anchor = Self::Anchor>;
+    fn get_line_mut(&mut self, index: Self::LineId) -> &mut Line {
+        B::get_line_mut(*self, index)
+    }
 
-    fn segments(&self) -> impl Iterator<Item = Self::Ref>;
+    // fn get_anchor(&self, id: Self::AnchorId) -> Self::Anchor {
+    //     B::get_anchor(*self, id)
+    // }
 }
 
 #[derive(Clone, Debug, Deref)]
-pub struct Segment {
+pub struct Line {
     #[deref]
-    segment: Seg,
+    line: Segment<f32>,
     is_used: bool,
 }
 
-impl From<Seg> for Segment {
-    fn from(segment: Seg) -> Self {
+impl From<Segment<f32>> for Line {
+    fn from(segment: Segment<f32>) -> Self {
         Self {
-            segment,
+            line: segment,
             is_used: false,
         }
     }
 }
 
-impl Segment {
-    pub fn new(segment: Seg) -> Self {
+impl Line {
+    pub fn new(segment: Segment<f32>) -> Self {
         Self {
-            segment,
+            line: segment,
             is_used: false,
         }
     }
 
-    pub fn get_segment(&self) -> &Seg {
-        &self.segment
+    pub fn segment(&self) -> &Segment<f32> {
+        &self.line
     }
 
     pub fn is_used(&self) -> bool {

@@ -7,10 +7,10 @@ pub use from_workers::*;
 mod from_rayon {
     use rayon::prelude::*;
 
-    pub use core::marker::Sync as CondSync;
     pub use core::marker::Send as CondSend;
+    pub use core::marker::Sync as CondSync;
 
-    pub fn for_each<T: CondSend>(bufs: &mut [T], f: impl Fn(usize, &mut T) + CondSync ) {
+    pub fn for_each<T: CondSend>(bufs: &mut [T], f: impl Fn(usize, &mut T) + CondSync) {
         bufs.par_iter_mut()
             .enumerate()
             .for_each(|(index, t)| f(index, t));

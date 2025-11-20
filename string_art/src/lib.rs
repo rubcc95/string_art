@@ -1,21 +1,23 @@
-pub mod computation; 
 pub mod board;
-pub mod ellipse;
-pub mod nails;
+pub mod computation;
 pub mod decay;
+pub mod ellipse;
 pub mod monocolor;
+pub mod nails;
 pub mod multicolor {}
 mod color_map;
 
-pub use color_map::ColorMap;
-pub use ellipse::Ellipse;
 pub use board::Board;
-pub use computation::Computation;
+pub use color_map::ColorMap;
+pub use computation::{Computation, Step};
+pub use ellipse::Ellipse;
 pub use monocolor::Monocolor;
+pub use pipeline::*;
 
-pub use string_art_math as math;
-pub use string_art_sync as sync;
-pub use string_art_geometry as geometry;
 pub use string_art_color as color;
+pub use string_art_geometry as geometry;
+pub use string_art_math as math;
 
 pub use color::Color;
+
+pub mod pipeline;

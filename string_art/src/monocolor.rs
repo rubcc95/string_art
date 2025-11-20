@@ -1,35 +1,175 @@
-use std::iter::FusedIterator;
+use crate::{
+    Pipeline, WeightMap, board::ValidBoard, color, computation::*, math::*, pipeline::PipelineLayer,
+};
 
-use crate::{ColorMap, computation::*, color, math::*, sync::*};
+use derive_more::Deref;
+#[cfg(feature = "image")]
+use pixel_to_frac::*;
 
-pub struct Monocolor<A, S: Scalar = Scalar32> {
-    pub map: ColorMap<A, Color, S::Frac>,
-    pub threads: u32,
+#[cfg(feature = "image")]
+mod pixel_to_frac {
+    use string_art_math::{Frac, Frac8, Frac16, Frac32, Frac64};
+
+    pub trait SubpixelToFrac<F> {
+        fn to_frac(self) -> F;
+    }
+
+    macro_rules! subpixel_to_frac_impl {
+        ($from:ty => $to:ty) => {
+            impl SubpixelToFrac<$to> for $from {
+                #[inline]
+                fn to_frac(self) -> $to {
+                    <$to>::from_bits(self)
+                }
+            }
+        };
+        ($from:ty => $to:ty, $replicate:expr) => {
+            impl SubpixelToFrac<$to> for $from {
+                #[inline]
+                fn to_frac(self) -> $to {
+                    <$to>::from_bits(self as <$to as Frac>::Bits) * $replicate
+                }
+            }
+        };
+
+        ($from:ty => $to:ty, d $shift:expr) => {
+            impl SubpixelToFrac<$to> for $from {
+                #[inline]
+                fn to_frac(self) -> $to {
+                    <$to>::from_bits((self >> $shift) as _)
+                }
+            }
+        };
+    }
+
+    subpixel_to_frac_impl!(u8 => Frac8);
+    subpixel_to_frac_impl!(u8 => Frac16, 0x0101);
+    subpixel_to_frac_impl!(u8 => Frac32, 0x01010101);
+    subpixel_to_frac_impl!(u8 => Frac64, 0x0101);
+
+    subpixel_to_frac_impl!(u16 => Frac8, d 8);
+    subpixel_to_frac_impl!(u16 => Frac16);
+    subpixel_to_frac_impl!(u16 => Frac32, 0x00010001);
+    subpixel_to_frac_impl!(u16 => Frac64, 0x0001000100010001);
+
+    subpixel_to_frac_impl!(u32 => Frac8, d 24);
+    subpixel_to_frac_impl!(u32 => Frac16, d 16);
+    subpixel_to_frac_impl!(u32 => Frac32);
+    subpixel_to_frac_impl!(u32 => Frac64, 0x0000000100000001);
+
+    subpixel_to_frac_impl!(u64 => Frac8, d 56);
+    subpixel_to_frac_impl!(u64 => Frac16, d 48);
+    subpixel_to_frac_impl!(u64 => Frac32, d 32);
+    subpixel_to_frac_impl!(u64 => Frac64);
 }
 
-impl<A: Default, S: Scalar> Monocolor<A, S> {
+#[derive(Deref, Debug, Clone)]
+pub struct Monocolor<S> {
+    pub grid: string_art_grid::Grid<S>,
+}
+
+impl<S: Frac> Monocolor<S> {
     #[cfg(feature = "image")]
     pub fn from_image(
-        image: &impl image::GenericImageView<Pixel: image::Pixel<Subpixel: IntoFrac<S::Frac>>>,
-        threads: u32,
+        image: &impl image::GenericImageView<Pixel: image::Pixel<Subpixel: SubpixelToFrac<S>>>,
     ) -> Self {
         use image::Pixel;
+        use string_art_grid::Grid;
 
         Self {
-            map: ColorMap {
-                anchor: A::default(),
-                color: Color,
-                weights: image
-                    .pixels()
-                    .map(|(_, _, mut pixel)| {
-                        pixel.invert();
-                        let [r] = pixel.to_luma().0;
-                        r.into_frac()
-                    })
-                    .collect(),
+            grid: unsafe {
+                use string_art_geometry::Rect;
+
+                Grid::from_raw(
+                    image
+                        .pixels()
+                        .map(|(_, _, mut pixel)| {
+                            pixel.invert();
+                            let [r] = pixel.to_luma().0;
+                            r.to_frac()
+                        })
+                        .collect(),
+                    Rect::new(image.width() as usize, image.height() as usize),
+                )
             },
-            threads,
         }
+    }
+}
+
+impl<F> WeightMap for Monocolor<F> {
+    type Weight = F;
+
+    fn get(&self, pixel: string_art_geometry::Point<usize>) -> Option<&Self::Weight> {
+        self.grid.get(pixel)
+    }
+
+    fn get_mut(&mut self, pixel: string_art_geometry::Point<usize>) -> Option<&mut Self::Weight> {
+        self.grid.get_mut(pixel)
+    }
+}
+
+impl<F: Frac> Pipeline for Monocolor<F> {
+    type MapId = ();
+
+    type Runtime<A> = MonocolorRuntime<A, F>;
+
+    type Weight = F;
+
+    type Layer<'a, A>
+        = &'a mut MonocolorRuntime<A, F>
+    where
+        Self: 'a,
+        A: 'a;
+
+    fn init<B: ValidBoard>(
+        self,
+        batched: &mut BatchedBoard<B, Self::Weight>,
+    ) -> Self::Runtime<B::Anchor> {
+        MonocolorRuntime {
+            anchor: batched
+                .get_best_line(&self, B::Anchor::default())
+                .map_or_else(B::Anchor::default, |step| step.anchor),
+            monocolor: self,
+        }
+    }
+
+    fn next<A>(runtime: &mut Self::Runtime<A>) -> Option<Self::Layer<'_, A>> {
+        Some(runtime)
+    }
+}
+
+pub struct MonocolorRuntime<A, F> {
+    monocolor: Monocolor<F>,
+    anchor: A,
+}
+
+impl<A, F> WeightMap for &mut MonocolorRuntime<A, F> {
+    type Weight = F;
+
+    fn get(&self, pixel: string_art_geometry::Point<usize>) -> Option<&Self::Weight> {
+        self.monocolor.grid.get(pixel)
+    }
+
+    fn get_mut(&mut self, pixel: string_art_geometry::Point<usize>) -> Option<&mut Self::Weight> {
+        self.monocolor.grid.get_mut(pixel)
+    }
+}
+
+impl<A, F> PipelineLayer for &mut MonocolorRuntime<A, F> {
+    type MapId = ();
+
+    type AnchorId = A;
+
+    fn anchor(&self) -> &Self::AnchorId {
+        &self.anchor
+    }
+
+    fn set_anchor(&mut self, id: Self::AnchorId) {
+        self.anchor = id;
+    }
+
+    fn id(&self) -> Self::MapId {
+        ()
     }
 }
 
@@ -61,129 +201,28 @@ impl core::fmt::Display for Color {
         Ok(())
     }
 }
-
-#[derive(Clone, Copy)]
-pub struct MonocolorIndex;
-
-impl Into<usize> for MonocolorIndex {
-    fn into(self) -> usize {
-        0
-    }
-}
-
-impl std::fmt::Display for MonocolorIndex {
-    fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Ok(())
-    }
-}
-
-impl<A: Clone + CondSend + CondSync, S: Scalar> Iterator for Monocolor<A, S> {
-    type Item = MonocolorIndex;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.threads.checked_sub(1).map(|val| {
-            self.threads = val;
-            MonocolorIndex
-        })
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let s = self.threads as usize;
-        (s, Some(s))
-    }
-}
-
-impl<A: Clone + CondSend + CondSync, S: Scalar> FusedIterator for Monocolor<A, S>{}
-
-impl<A: Clone + CondSend + CondSync, S: Scalar> ExactSizeIterator for Monocolor<A, S>{
-    fn len(&self) -> usize {
-        self.threads as usize
-    }
-}
-
-impl<A: Clone + CondSend + CondSync, S: Scalar> Pipeline for Monocolor<A, S> {
-    type Anchor = A;
-
-    type Color = Color;
-
-    type Index = MonocolorIndex;
-
-    type Scalar = S;
-
-    fn color_map(&self, _: &Self::Index) -> &ColorMap<A, Color, S::Frac> {
-        &self.map
-    }
-
-    fn color_map_mut(&mut self, _: &Self::Index) -> &mut ColorMap<A, Color, S::Frac> {
-        &mut self.map
-    }
-
-    fn color_maps(&self) -> &[ColorMap<A, Color, S::Frac>] {
-        core::slice::from_ref(&self.map)
-    }
-
-    fn color_maps_mut(&mut self) -> &mut [ColorMap<A, Color, S::Frac>] {
-        core::slice::from_mut(&mut self.map)
-    }
-
-    // fn startup<T>(
-    //     &mut self,
-    //     mut f: impl FnMut(&mut ColorMap<A, Color, S::Frac>) -> T,
-    // ) -> impl Iterator<Item = T> {
-    //     core::iter::once(f(&mut self.map))
-    // }
-
-    // fn next<T>(
-    //     &mut self,
-    //     mut f: impl FnMut(MonocolorIndex, &mut ColorMap<A, Color, S::Frac>) -> T,
-    // ) -> Option<T> {
-    //     if self.threads > 0 {
-    //         self.threads -= 1;
-    //         Some(f(MonocolorIndex(()), &mut self.map))
-    //     } else {
-    //         None
-    //     }
-    // }
-}
-
-// impl<A: Clone + CondSend + CondSync, S: FracToScalar> Pipeline for Monocolor<A, S> {
-//     type Anchor = A;
+// impl<A: Clone + CondSend + CondSync, S: Fixed> Pipeline for Monocolor<A, S> {
+//     type AnchorId = A;
 
 //     type Color = Color;
 
-//     type Index = ();
+//     type Index = MonocolorIndex;
 
-//     type Frac = S;
+//     type Fixed = S;
 
-//     fn startup(
-//         &mut self,
-//     ) -> impl Iterator<Item = (Self::Index, &mut ColorMap<A, Self::Color, Self::Frac>)> {
-//         core::iter::once(((), &mut self.map))
-//     }
-
-//     fn next(
-//             &mut self,
-//         ) -> Option<(
-//             Self::Index,
-//             &mut ColorMap<A, Self::Color, Self::Frac>,
-//         )> {
-//         //if self.threads <
-//     }
-
-//     // fn for_each<E>(
-//     //     &mut self,
-//     //     mut f: impl FnMut(
-//     //         Self::Index,
-//     //         &mut ColorMap<A, Self::Color, Self::Frac>,
-//     //     ) -> Result<(), E>,
-//     // ) -> Result<(), E> {
-//     //     for _ in 0..self.threads {
-//     //         f((), &mut self.map)?;
-//     //     }
-//     //     Ok(())
-//     // }
-
-//     fn color_map(&self, _: &Self::Index) -> &ColorMap<A, Self::Color, Self::Frac> {
+//     fn color_map(&self, _: &Self::Index) -> &ColorMap<A, Color, S::Frac> {
 //         &self.map
+//     }
+
+//     fn color_map_mut(&mut self, _: &Self::Index) -> &mut ColorMap<A, Color, S::Frac> {
+//         &mut self.map
+//     }
+
+//     fn color_maps(&self) -> &[ColorMap<A, Color, S::Frac>] {
+//         core::slice::from_ref(&self.map)
+//     }
+
+//     fn color_maps_mut(&mut self) -> &mut [ColorMap<A, Color, S::Frac>] {
+//         core::slice::from_mut(&mut self.map)
 //     }
 // }

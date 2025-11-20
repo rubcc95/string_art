@@ -1,0 +1,15 @@
+{
+  "name": "string_art_bindings",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "string_art_bindings_bg.wasm",
+    "string_art_bindings.js",
+    "string_art_bindings.d.ts"
+  ],
+  "main": "string_art_bindings.js",
+  "types": "string_art_bindings.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
