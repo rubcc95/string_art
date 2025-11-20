@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:string_art_gui/models/image_data.dart';
+import 'package:string_art_gui/pages/computation_page.dart';
+
+import '../models/computation.dart';
+import '../models/engine.dart';
 
 class ImagePage extends StatefulWidget {
   const ImagePage(this.image, {super.key});
@@ -53,14 +57,24 @@ class _ImagePageState extends State<ImagePage> {
               itemCount: 10,
               separatorBuilder: (_, __) => const SizedBox(width: 12),
               itemBuilder: (context, index) {
-                return Container(
-                  width: 100,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(12),
-                    image: DecorationImage(
-                      image: MemoryImage(widget.image.buffer),
-                      fit: BoxFit.cover,
+                return InkWell(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => ComputationPage(
+                        widget.image,
+                        Computation(Settings(), widget.image.buffer),
+                      ),
+                    ),
+                  ),
+                  child: Container(
+                    width: 100,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(12),
+                      image: DecorationImage(
+                        image: MemoryImage(widget.image.buffer),
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                 );

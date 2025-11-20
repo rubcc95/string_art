@@ -11,7 +11,8 @@ class NativeEngine extends Engine {
   }
 
   @override
-  Future<Pipeline> build(Uint8List image) {
+  Future<StepIterator> build(Settings settings, Uint8List image) {
+    // TODO: implement build
     throw UnimplementedError();
   }
 }

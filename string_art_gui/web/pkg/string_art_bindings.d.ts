@@ -6,21 +6,6 @@ export class Computation {
   [Symbol.dispose](): void;
   next(): Step | undefined;
 }
-export class MonocolorPipeline {
-  free(): void;
-  [Symbol.dispose](): void;
-  constructor(image_buffer: Uint8Array);
-  build(settings: MonocolorSettings): Computation;
-}
-export class MonocolorSettings {
-  free(): void;
-  [Symbol.dispose](): void;
-  constructor();
-  decay: number;
-  minNailDistance: number;
-  nailCount: number;
-  circularNailRadius: number;
-}
 export class Point {
   private constructor();
   free(): void;
@@ -34,6 +19,15 @@ export class Segment {
   [Symbol.dispose](): void;
   readonly start: Point;
   readonly end: Point;
+}
+export class Settings {
+  free(): void;
+  [Symbol.dispose](): void;
+  constructor();
+  decay: number;
+  minNailDistance: number;
+  nailCount: number;
+  circularNailRadius: number;
 }
 export class Step {
   private constructor();
@@ -75,24 +69,20 @@ export interface InitOutput {
   readonly __wbg_wasmerror_free: (a: number, b: number) => void;
   readonly __wbg_get_wasmerror_message: (a: number) => [number, number];
   readonly __wbg_set_wasmerror_message: (a: number, b: number, c: number) => void;
-  readonly __wbg_monocolorpipeline_free: (a: number, b: number) => void;
-  readonly monocolorpipeline_new: (a: number, b: number) => [number, number, number];
-  readonly monocolorpipeline_build: (a: number, b: number) => [number, number, number];
-  readonly __wbg_monocolorsettings_free: (a: number, b: number) => void;
-  readonly __wbg_get_monocolorsettings_decay: (a: number) => number;
-  readonly __wbg_set_monocolorsettings_decay: (a: number, b: number) => void;
-  readonly monocolorsettings_new: () => number;
-  readonly monocolorsettings_minNailDistance: (a: number) => number;
-  readonly monocolorsettings_set_minNailDistance: (a: number, b: number) => void;
-  readonly monocolorsettings_nailCount: (a: number) => number;
-  readonly monocolorsettings_set_nailCount: (a: number, b: number) => void;
-  readonly monocolorsettings_circularNailRadius: (a: number) => number;
-  readonly monocolorsettings_set_circularNailRadius: (a: number, b: number) => void;
+  readonly __wbg_settings_free: (a: number, b: number) => void;
+  readonly __wbg_get_settings_decay: (a: number) => number;
+  readonly __wbg_set_settings_decay: (a: number, b: number) => void;
+  readonly settings_new: () => number;
+  readonly settings_minNailDistance: (a: number) => number;
+  readonly settings_set_minNailDistance: (a: number, b: number) => void;
+  readonly settings_nailCount: (a: number) => number;
+  readonly settings_set_nailCount: (a: number, b: number) => void;
+  readonly settings_circularNailRadius: (a: number) => number;
+  readonly settings_set_circularNailRadius: (a: number, b: number) => void;
   readonly __wbindgen_externrefs: WebAssembly.Table;
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __wbindgen_malloc: (a: number, b: number) => number;
   readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
-  readonly __externref_table_dealloc: (a: number) => void;
   readonly __wbindgen_start: () => void;
 }
 

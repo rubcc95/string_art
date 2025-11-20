@@ -49,17 +49,26 @@ pub struct Computation(Box<dyn Iterator<Item = Step>>);
 
 impl Computation {
     pub fn new<B: WasmBoard, P: WasmPipeline<B::Anchor>>(
-        board: B,
-        pipeline: P,
+        settings: &Settings,
+        image_buffer: &[u8],
         decay: f32,
-    ) -> Self {
-        Self(Box::new(ComputationImpl(
+    ) -> Result<Self, WasmError> {
+        let pipeline =
+            string_art::Monocolor::from_image(&image::load_from_memory(image_buffer).to_wasm()?);
+        let board = string_art::ellipse::Ellipse::new(
+            pipeline.rect().as_(),
+            string_art::nails::UniformCircular(settings.circular_nail_radius),
+            settings.nail_count,
+            settings.min_nail_distance,
+        )
+        .to_wasm()?;
+        Ok(Self(Box::new(ComputationImpl(
             string_art::computation::Computation::new(
                 pipeline,
                 board,
                 Frac16::from_bits((u16::MAX as f32 * decay) as u16),
             ),
-        )))
+        ))))
     }
 }
 #[wasm_bindgen]
@@ -165,30 +174,6 @@ impl WasmLink for nails::circular::Direction {
 impl WasmLink for nails::point::Link {
     fn to_u8(&self) -> u8 {
         0
-    }
-}
-
-#[wasm_bindgen]
-pub struct Pipeline(string_art::Monocolor<Frac16>);
-
-#[wasm_bindgen]
-impl Pipeline {
-    #[wasm_bindgen(constructor)]
-    pub fn new(image_buffer: &[u8]) -> Result<Self, WasmError> {
-        Ok(Self(string_art::Monocolor::from_image(
-            &image::load_from_memory(image_buffer).to_wasm()?,
-        )))
-    }
-
-    pub fn build(&self, settings: &Settings) -> Result<Computation, WasmError> {
-        let board = string_art::ellipse::Ellipse::new(
-            self.0.rect().as_(),
-            string_art::nails::UniformCircular(settings.circular_nail_radius),
-            settings.nail_count,
-            settings.min_nail_distance,
-        )
-        .to_wasm()?;
-        Ok(Computation::new(board, self.0.clone(), settings.decay))
     }
 }
 

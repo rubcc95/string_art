@@ -29,7 +29,7 @@ class _LoadPageState extends State<LoadPage> {
     return Scaffold(
       body: Center(
         child: _isLoaded
-            ? const HomePage(title: "Welcome to the hell")
+            ? const HomePage()
             : _error != null
             ? Text('Error loading WASM: ${_error.toString()}')
             : const CircularProgressIndicator(),
