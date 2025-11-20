@@ -14,23 +14,14 @@ class JsEngine extends Engine {
   }
 
   @override
-  Future<Pipeline> build(Uint8List image) async {
-    return JsPipeline(interop.Pipeline(image.toJS));
-  }
-}
-
-class JsPipeline extends Pipeline {
-  JsPipeline(this._pipeline);
-  final interop.Pipeline _pipeline;
-
-  @override
-  StepIterator build(Settings settings) {
-    return JsStepIterator(_pipeline.build(settings.toJS));
+  Future<StepIterator> build(Settings settings, Uint8List image) async {
+    return JsStepIterator(interop.Computation(settings.toJS, image.toJS));
   }
 }
 
 class JsStepIterator extends StepIterator {
   JsStepIterator(this._computation);
+
   final interop.Computation _computation;
 
   @override

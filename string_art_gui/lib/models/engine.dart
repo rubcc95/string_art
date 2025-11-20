@@ -15,11 +15,7 @@ abstract class Engine {
 
   Future<void> init();
 
-  Future<Pipeline> build(Uint8List image);
-}
-
-abstract class Pipeline {
-  StepIterator build(Settings settings);
+  Future<StepIterator> build(Settings settings, Uint8List image);
 }
 
 class Settings {

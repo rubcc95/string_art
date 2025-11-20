@@ -90,32 +90,11 @@ function passStringToWasm0(arg, malloc, realloc) {
     return ptr;
 }
 
-function passArray8ToWasm0(arg, malloc) {
-    const ptr = malloc(arg.length * 1, 1) >>> 0;
-    getUint8ArrayMemory0().set(arg, ptr / 1);
-    WASM_VECTOR_LEN = arg.length;
-    return ptr;
-}
-
-function takeFromExternrefTable0(idx) {
-    const value = wasm.__wbindgen_externrefs.get(idx);
-    wasm.__externref_table_dealloc(idx);
-    return value;
-}
-
 const ComputationFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_computation_free(ptr >>> 0, 1));
 
 export class Computation {
-
-    static __wrap(ptr) {
-        ptr = ptr >>> 0;
-        const obj = Object.create(Computation.prototype);
-        obj.__wbg_ptr = ptr;
-        ComputationFinalization.register(obj, obj.__wbg_ptr, obj);
-        return obj;
-    }
 
     __destroy_into_raw() {
         const ptr = this.__wbg_ptr;
@@ -137,132 +116,6 @@ export class Computation {
     }
 }
 if (Symbol.dispose) Computation.prototype[Symbol.dispose] = Computation.prototype.free;
-
-const MonocolorPipelineFinalization = (typeof FinalizationRegistry === 'undefined')
-    ? { register: () => {}, unregister: () => {} }
-    : new FinalizationRegistry(ptr => wasm.__wbg_monocolorpipeline_free(ptr >>> 0, 1));
-
-export class MonocolorPipeline {
-
-    __destroy_into_raw() {
-        const ptr = this.__wbg_ptr;
-        this.__wbg_ptr = 0;
-        MonocolorPipelineFinalization.unregister(this);
-        return ptr;
-    }
-
-    free() {
-        const ptr = this.__destroy_into_raw();
-        wasm.__wbg_monocolorpipeline_free(ptr, 0);
-    }
-    /**
-     * @param {Uint8Array} image_buffer
-     */
-    constructor(image_buffer) {
-        const ptr0 = passArray8ToWasm0(image_buffer, wasm.__wbindgen_malloc);
-        const len0 = WASM_VECTOR_LEN;
-        const ret = wasm.monocolorpipeline_new(ptr0, len0);
-        if (ret[2]) {
-            throw takeFromExternrefTable0(ret[1]);
-        }
-        this.__wbg_ptr = ret[0] >>> 0;
-        MonocolorPipelineFinalization.register(this, this.__wbg_ptr, this);
-        return this;
-    }
-    /**
-     * @param {MonocolorSettings} settings
-     * @returns {Computation}
-     */
-    build(settings) {
-        const ptr = this.__destroy_into_raw();
-        _assertClass(settings, MonocolorSettings);
-        var ptr0 = settings.__destroy_into_raw();
-        const ret = wasm.monocolorpipeline_build(ptr, ptr0);
-        if (ret[2]) {
-            throw takeFromExternrefTable0(ret[1]);
-        }
-        return Computation.__wrap(ret[0]);
-    }
-}
-if (Symbol.dispose) MonocolorPipeline.prototype[Symbol.dispose] = MonocolorPipeline.prototype.free;
-
-const MonocolorSettingsFinalization = (typeof FinalizationRegistry === 'undefined')
-    ? { register: () => {}, unregister: () => {} }
-    : new FinalizationRegistry(ptr => wasm.__wbg_monocolorsettings_free(ptr >>> 0, 1));
-
-export class MonocolorSettings {
-
-    __destroy_into_raw() {
-        const ptr = this.__wbg_ptr;
-        this.__wbg_ptr = 0;
-        MonocolorSettingsFinalization.unregister(this);
-        return ptr;
-    }
-
-    free() {
-        const ptr = this.__destroy_into_raw();
-        wasm.__wbg_monocolorsettings_free(ptr, 0);
-    }
-    /**
-     * @returns {number}
-     */
-    get decay() {
-        const ret = wasm.__wbg_get_monocolorsettings_decay(this.__wbg_ptr);
-        return ret;
-    }
-    /**
-     * @param {number} arg0
-     */
-    set decay(arg0) {
-        wasm.__wbg_set_monocolorsettings_decay(this.__wbg_ptr, arg0);
-    }
-    constructor() {
-        const ret = wasm.monocolorsettings_new();
-        this.__wbg_ptr = ret >>> 0;
-        MonocolorSettingsFinalization.register(this, this.__wbg_ptr, this);
-        return this;
-    }
-    /**
-     * @returns {number}
-     */
-    get minNailDistance() {
-        const ret = wasm.monocolorsettings_minNailDistance(this.__wbg_ptr);
-        return ret >>> 0;
-    }
-    /**
-     * @param {number} distance
-     */
-    set minNailDistance(distance) {
-        wasm.monocolorsettings_set_minNailDistance(this.__wbg_ptr, distance);
-    }
-    /**
-     * @returns {number}
-     */
-    get nailCount() {
-        const ret = wasm.monocolorsettings_nailCount(this.__wbg_ptr);
-        return ret >>> 0;
-    }
-    /**
-     * @param {number} count
-     */
-    set nailCount(count) {
-        wasm.monocolorsettings_set_nailCount(this.__wbg_ptr, count);
-    }
-    /**
-     * @returns {number}
-     */
-    get circularNailRadius() {
-        const ret = wasm.monocolorsettings_circularNailRadius(this.__wbg_ptr);
-        return ret;
-    }
-    /**
-     * @param {number} radius
-     */
-    set circularNailRadius(radius) {
-        wasm.monocolorsettings_set_circularNailRadius(this.__wbg_ptr, radius);
-    }
-}
-if (Symbol.dispose) MonocolorSettings.prototype[Symbol.dispose] = MonocolorSettings.prototype.free;
 
 const PointFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
@@ -347,6 +200,84 @@ export class Segment {
     }
 }
 if (Symbol.dispose) Segment.prototype[Symbol.dispose] = Segment.prototype.free;
+
+const SettingsFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_settings_free(ptr >>> 0, 1));
+
+export class Settings {
+
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        SettingsFinalization.unregister(this);
+        return ptr;
+    }
+
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_settings_free(ptr, 0);
+    }
+    /**
+     * @returns {number}
+     */
+    get decay() {
+        const ret = wasm.__wbg_get_settings_decay(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * @param {number} arg0
+     */
+    set decay(arg0) {
+        wasm.__wbg_set_settings_decay(this.__wbg_ptr, arg0);
+    }
+    constructor() {
+        const ret = wasm.settings_new();
+        this.__wbg_ptr = ret >>> 0;
+        SettingsFinalization.register(this, this.__wbg_ptr, this);
+        return this;
+    }
+    /**
+     * @returns {number}
+     */
+    get minNailDistance() {
+        const ret = wasm.settings_minNailDistance(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @param {number} distance
+     */
+    set minNailDistance(distance) {
+        wasm.settings_set_minNailDistance(this.__wbg_ptr, distance);
+    }
+    /**
+     * @returns {number}
+     */
+    get nailCount() {
+        const ret = wasm.settings_nailCount(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @param {number} count
+     */
+    set nailCount(count) {
+        wasm.settings_set_nailCount(this.__wbg_ptr, count);
+    }
+    /**
+     * @returns {number}
+     */
+    get circularNailRadius() {
+        const ret = wasm.settings_circularNailRadius(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * @param {number} radius
+     */
+    set circularNailRadius(radius) {
+        wasm.settings_set_circularNailRadius(this.__wbg_ptr, radius);
+    }
+}
+if (Symbol.dispose) Settings.prototype[Symbol.dispose] = Settings.prototype.free;
 
 const StepFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
@@ -436,14 +367,6 @@ const WasmErrorFinalization = (typeof FinalizationRegistry === 'undefined')
 
 export class WasmError {
 
-    static __wrap(ptr) {
-        ptr = ptr >>> 0;
-        const obj = Object.create(WasmError.prototype);
-        obj.__wbg_ptr = ptr;
-        WasmErrorFinalization.register(obj, obj.__wbg_ptr, obj);
-        return obj;
-    }
-
     __destroy_into_raw() {
         const ptr = this.__wbg_ptr;
         this.__wbg_ptr = 0;
@@ -521,10 +444,6 @@ function __wbg_get_imports() {
     imports.wbg = {};
     imports.wbg.__wbg___wbindgen_throw_b855445ff6a94295 = function(arg0, arg1) {
         throw new Error(getStringFromWasm0(arg0, arg1));
-    };
-    imports.wbg.__wbg_wasmerror_new = function(arg0) {
-        const ret = WasmError.__wrap(arg0);
-        return ret;
     };
     imports.wbg.__wbindgen_init_externref_table = function() {
         const table = wasm.__wbindgen_externrefs;

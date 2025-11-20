@@ -38,13 +38,6 @@ extension type Step._(JSObject _obj) {
 }
 
 @JS()
-extension type Pipeline._(JSObject _obj) {
-  external factory Pipeline(JSUint8Array imageBuffer);
-
-  external Computation build(Settings settings);
-}
-
-@JS()
 extension type Settings._(JSObject _obj) {
   external factory Settings();
 
@@ -81,6 +74,7 @@ extension NativeSettings on native.Settings {
 
 @JS()
 extension type Computation._(JSObject _obj) {
+  external factory Computation(Settings settings, JSUint8Array imageBuffer);
   external Step? next();
 }
 

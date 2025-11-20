@@ -1,10 +1,3 @@
-//! xtask - helper to build wasm bindings and run the Flutter GUI with improved diagnostics.
-//!
-//! This file replaces the original main.rs to provide:
-//! - clearer diagnostics about PATH and which `flutter` would be used,
-//! - multiple invocation strategies on Windows to handle .bat/.cmd launchers,
-//! - helpful hints when execution fails.
-
 use clap::{Parser, ValueEnum};
 use std::{
     env,
@@ -56,8 +49,8 @@ fn main() {
             .arg("--target")
             .arg("web")
             .arg("--out-dir")
-            .arg("--release")
-            .arg(&output_path);
+            .arg(&output_path)
+            .arg("--release");
 
         if !args.release {
             wasm_pack.arg("--no-opt");
@@ -79,15 +72,12 @@ fn main() {
             }
         }
 
-        // Remove .gitignore left by wasm-pack if present (best-effort)
         if let Err(err) = fs::remove_file(output_path.join(".gitignore")) {
             eprintln!(
                 "WARN: Could not remove {}: {}",
                 output_path.join(".gitignore").display(),
                 err
             );
-        } else {
-            eprintln!("DEBUG: Removed generated .gitignore");
         }
 
         eprintln!(
@@ -96,43 +86,6 @@ fn main() {
         );
     }
 
-    // Print diagnostic environment information so user can see what the process sees
-    eprintln!("DEBUG: current_dir = {}", string_art_gui_path.display());
-    eprintln!(
-        "DEBUG: PATH = {}",
-        env::var("PATH").unwrap_or_else(|_| "<no PATH>".to_string())
-    );
-    if cfg!(windows) {
-        eprintln!(
-            "DEBUG: PATHEXT = {}",
-            env::var("PATHEXT").unwrap_or_else(|_| "<no PATHEXT>".to_string())
-        );
-    }
-
-    // Print resolution from OS helpers (where / command -v)
-    if cfg!(windows) {
-        match Command::new("where").arg("flutter").output() {
-            Ok(out) => {
-                let s = String::from_utf8_lossy(&out.stdout);
-                eprintln!("DEBUG: where flutter -> {}", s.trim());
-            }
-            Err(e) => eprintln!("DEBUG: failed to run `where flutter`: {e}"),
-        }
-    } else {
-        match Command::new("sh")
-            .arg("-c")
-            .arg("command -v flutter")
-            .output()
-        {
-            Ok(out) => {
-                let s = String::from_utf8_lossy(&out.stdout);
-                eprintln!("DEBUG: command -v flutter -> {}", s.trim());
-            }
-            Err(e) => eprintln!("DEBUG: failed to run `command -v flutter`: {e}"),
-        }
-    }
-
-    // Build flutter args according to CLI args
     let action = if args.build { "build" } else { "run" };
     let device = match args.platform {
         Platform::Web => "edge",
@@ -146,110 +99,28 @@ fn main() {
         flutter_args.push(OsString::from("--release"));
     }
 
-    // Try invocation strategies in order:
-    // 1) Direct `flutter` (common on Unix and many Windows setups)
-    // 2) On Windows: `cmd /C flutter ...` (useful when flutter is a batch script)
-    // 3) Absolute path to discovered flutter (where/command-v scan)
-    // Stop on first successful run.
+    let mut cmd_args: Vec<OsString> = Vec::new();
+    cmd_args.push(OsString::from("/C"));
+    cmd_args.push(OsString::from("flutter"));
+    cmd_args.extend(flutter_args.iter().cloned());
 
-    // Attempt 1: direct name
-    match run_with(program("flutter"), &flutter_args, &string_art_gui_path) {
+    match run_with(program("cmd"), &cmd_args, &string_art_gui_path) {
         Ok(status) => {
             if status.success() {
-                eprintln!("INFO: `flutter {}` executed successfully (direct).", action);
+                eprintln!("INFO: `cmd /C flutter {}` executed successfully.", action);
                 return;
             } else {
                 eprintln!(
-                    "WARN: `flutter {}` returned exit code {:?}",
+                    "WARN: `cmd /C flutter {}` returned exit code {:?}",
                     action,
                     status.code()
                 );
-                // Keep trying fallbacks
             }
         }
         Err(e) => {
-            eprintln!("DEBUG: direct spawn of `flutter` failed: {e}");
+            eprintln!("DEBUG: `cmd /C flutter` spawn failed: {e}");
         }
     }
-
-    // Attempt 2: Windows-specific fallback using cmd /C flutter ...
-    if cfg!(windows) {
-        eprintln!("INFO: trying Windows fallback: `cmd /C flutter ...`");
-        // Build args: /C flutter <flutter_args...>
-        let mut cmd_args: Vec<OsString> = Vec::new();
-        cmd_args.push(OsString::from("/C"));
-        cmd_args.push(OsString::from("flutter"));
-        cmd_args.extend(flutter_args.iter().cloned());
-
-        match run_with(program("cmd"), &cmd_args, &string_art_gui_path) {
-            Ok(status) => {
-                if status.success() {
-                    eprintln!("INFO: `cmd /C flutter {}` executed successfully.", action);
-                    return;
-                } else {
-                    eprintln!(
-                        "WARN: `cmd /C flutter {}` returned exit code {:?}",
-                        action,
-                        status.code()
-                    );
-                }
-            }
-            Err(e) => {
-                eprintln!("DEBUG: `cmd /C flutter` spawn failed: {e}");
-            }
-        }
-    }
-
-    // Attempt 3: try absolute path found by PATH scanning or helper
-    if let Some(abs) = resolve_flutter_path() {
-        eprintln!(
-            "INFO: attempting to run resolved flutter at: {}",
-            abs.display()
-        );
-        let mut abs_args: Vec<OsString> = flutter_args.iter().cloned().collect();
-        match run_with(program(abs), &abs_args, &string_art_gui_path) {
-            Ok(status) => {
-                if status.success() {
-                    eprintln!("INFO: resolved flutter executed successfully.");
-                    return;
-                } else {
-                    eprintln!(
-                        "WARN: resolved flutter returned exit code {:?}",
-                        status.code()
-                    );
-                }
-            }
-            Err(e) => {
-                eprintln!("DEBUG: executing resolved flutter failed: {e}");
-            }
-        }
-    } else {
-        eprintln!("DEBUG: no resolved absolute flutter path found by scanning PATH/helpers.");
-    }
-
-    // Final helpful failure output
-    eprintln!();
-    eprintln!("FATAL: failed to execute `flutter {}`.", action);
-    eprintln!("Last diagnostics printed above. Common causes & fixes:");
-    eprintln!(
-        "- Ensure Flutter is installed and `flutter` is on the PATH visible to the process running `cargo`."
-    );
-    eprintln!(
-        "- If you added Flutter to PATH recently, restart your terminal/IDE so the environment is propagated."
-    );
-    eprintln!(
-        "- On Windows, flutter may be a batch file; the `cmd /C` fallback is attempted above."
-    );
-    eprintln!("- To force a specific Flutter binary, run cargo with PATH explicitly:");
-    eprintln!("    Windows cmd:  set PATH=C:\\\\flutter\\\\bin;%PATH% && cargo run -p xtask");
-    eprintln!(
-        "    PowerShell:    $env:PATH = 'C:\\\\flutter\\\\bin;' + $env:PATH; cargo run -p xtask"
-    );
-    eprintln!("    Unix:         PATH=/path/to/flutter/bin:$PATH cargo run -p xtask");
-    eprintln!();
-    eprintln!("If you paste the debug output (the DEBUG: lines) I can help further.");
-
-    exit(1);
 }
 
 /// Helper to create a program identifier that Command::new can accept.
