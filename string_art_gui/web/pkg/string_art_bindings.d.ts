@@ -4,9 +4,10 @@ export class Computation {
   free(): void;
   [Symbol.dispose](): void;
   constructor(settings: any);
+  rect(): any;
   next(): any | undefined;
 }
-export class WasmFailErrorError {
+export class WasmError {
   private constructor();
   free(): void;
   [Symbol.dispose](): void;
@@ -19,10 +20,11 @@ export interface InitOutput {
   readonly memory: WebAssembly.Memory;
   readonly __wbg_computation_free: (a: number, b: number) => void;
   readonly computation_new: (a: any) => [number, number, number];
+  readonly computation_rect: (a: number) => [number, number, number];
   readonly computation_next: (a: number) => any;
-  readonly __wbg_wasmfailerrorerror_free: (a: number, b: number) => void;
-  readonly __wbg_get_wasmfailerrorerror_message: (a: number) => [number, number];
-  readonly __wbg_set_wasmfailerrorerror_message: (a: number, b: number, c: number) => void;
+  readonly __wbg_wasmerror_free: (a: number, b: number) => void;
+  readonly __wbg_get_wasmerror_message: (a: number) => [number, number];
+  readonly __wbg_set_wasmerror_message: (a: number, b: number, c: number) => void;
   readonly __wbindgen_malloc: (a: number, b: number) => number;
   readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
   readonly __wbindgen_exn_store: (a: number) => void;

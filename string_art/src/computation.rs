@@ -2,10 +2,12 @@ use crate::{
     Board, Pipeline, PipelineLayer, ValidPipelineLayer, ValidWeightMap, WeightMap,
     board::ValidBoard, geometry::Segment, math::*,
 };
+use log::info;
 use num_traits::SaturatingSub;
 
 #[cfg(feature = "rayon")]
 use num_cpus::get as cpus;
+use string_art_geometry::Rect;
 
 #[cfg(not(feature = "rayon"))]
 pub const fn cpus() -> usize {
@@ -34,6 +36,7 @@ where
     for<'a> P: Pipeline<Weight: Frac, Layer<'a, B::Anchor>: ValidPipelineLayer>,
 {
     pub fn new(pipeline: P, board: B, decay: P::Weight) -> Self {
+        env_logger::init();
         let mut batched_board = BatchedBoard {
             bufs: board.get_batches(cpus()).map(BatchBuffer::new).collect(),
             board,
@@ -44,6 +47,10 @@ where
             inner: batched_board,
             decay,
         }
+    }
+
+    pub fn rect(&self) -> Rect<u32> {
+        P::rect(&self.runtime)
     }
 }
 
@@ -100,6 +107,7 @@ where
         map: &impl ValidWeightMap<Weight = F>,
         anchor: B::Anchor,
     ) -> Option<StepId<B::LineId, B::Anchor>> {
+        info!("Holita llamando a get_best_line");
         #[cfg(not(feature = "rayon"))]
         for buffer in &mut self.bufs {
             buffer.get_best_line(&self.board, map, anchor);

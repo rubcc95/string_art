@@ -1,4 +1,4 @@
-use string_art_geometry::Point;
+use string_art_geometry::{Point, Rect};
 use string_art_math::Frac;
 //use string_art_sync::*;
 
@@ -19,6 +19,8 @@ pub trait Pipeline {
     ) -> Self::Runtime<B::Anchor>;
 
     fn next<A>(runtime: &mut Self::Runtime<A>) -> Option<Self::Layer<'_, A>>;
+
+    fn rect<A>(runtime: &Self::Runtime<A>) -> Rect<u32>;
 }
 
 pub trait PipelineLayer: WeightMap {

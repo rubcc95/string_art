@@ -1,19 +1,10 @@
 import 'package:flutter/material.dart';
 
-class Point {
-  Point(this.x, this.y);
-
-  Point.squared(double v) : x = v, y = v;
-
-  double x;
-  double y;
-}
-
 class Segment {
   Segment(this.start, this.end);
 
-  Point start;
-  Point end;
+  Offset start;
+  Offset end;
 }
 
 class Step {

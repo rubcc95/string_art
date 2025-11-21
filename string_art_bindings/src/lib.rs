@@ -1,7 +1,11 @@
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen::{from_value, to_value};
 use string_art::{
-    Board, ValidPipelineLayer, board::ValidBoard, geometry::Segment, math::Frac16, nails,
+    Board, ValidPipelineLayer,
+    board::ValidBoard,
+    geometry::{Rect, Segment},
+    math::Frac16,
+    nails,
 };
 use wasm_bindgen::prelude::*;
 
@@ -12,48 +16,13 @@ pub struct Step {
     pub nail: usize,
     pub link: u8,
 }
-
-// #[wasm_bindgen]
-// #[derive(Copy, Clone, Serialize, Deserialize)]
-// pub struct Segment(geometry::Segment<f32>);
-
-// #[wasm_bindgen]
-// impl Segment {
-//     #[wasm_bindgen(getter)]
-//     pub fn start(&self) -> Point {
-//         Point(self.0.start)
-//     }
-
-//     #[wasm_bindgen(getter)]
-//     pub fn end(&self) -> Point {
-//         Point(self.0.end)
-//     }
-// }
-
-// #[wasm_bindgen]
-// #[derive(Copy, Clone, Serialize, Deserialize)]
-// pub struct Point(geometry::Point<f32>);
-
-// #[wasm_bindgen]
-// impl Point {
-//     #[wasm_bindgen(getter)]
-//     pub fn x(&self) -> f32 {
-//         self.0.x
-//     }
-
-//     #[wasm_bindgen(getter)]
-//     pub fn y(&self) -> f32 {
-//         self.0.y
-//     }
-// }
-
 #[wasm_bindgen]
-pub struct Computation(Box<dyn Iterator<Item = JsValue>>);
+pub struct Computation(Box<dyn ComputationImpl>);
 
 #[wasm_bindgen]
 impl Computation {
     #[wasm_bindgen(constructor)]
-    pub fn new(settings: JsValue) -> Result<Self, WasmFailErrorError> {
+    pub fn new(settings: JsValue) -> Result<Self, WasmError> {
         let settings = Settings::new(settings)?;
         let pipeline = string_art::Monocolor::from_image(
             &image::load_from_memory(&settings.buffer).to_wasm()?,
@@ -65,7 +34,7 @@ impl Computation {
             settings.min_nail_distance,
         )
         .to_wasm()?;
-        Ok(Self(Box::new(ComputationImpl(
+        Ok(Self(Box::new(ComputationWrapper(
             string_art::computation::Computation::new(
                 pipeline,
                 board,
@@ -74,44 +43,28 @@ impl Computation {
         ))))
     }
 
+    pub fn rect(&self) -> Result<JsValue, WasmError> {
+        to_value(&self.0.rect()).to_wasm()
+    }
+
     pub fn next(&mut self) -> Option<JsValue> {
         self.0.next()
     }
 }
 
-#[wasm_bindgen(getter_with_clone)]
-#[derive(Debug)]
-pub struct WasmFailErrorError {
-    pub message: String,
+trait ComputationImpl: Iterator<Item = JsValue> {
+    fn rect(&self) -> Rect<u32>;
 }
 
-impl core::fmt::Display for WasmFailErrorError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.message)
+struct ComputationWrapper<B: Board, P: string_art::Pipeline>(string_art::Computation<B, P>);
+
+impl<B: WasmBoard, P: WasmPipeline<B::Anchor>> ComputationImpl for ComputationWrapper<B, P> {
+    fn rect(&self) -> Rect<u32> {
+        self.0.rect()
     }
 }
 
-impl std::error::Error for WasmFailErrorError {}
-
-pub trait ResultExt {
-    type Ok;
-
-    fn to_wasm(self) -> Result<Self::Ok, WasmFailErrorError>;
-}
-
-impl<T, E: core::fmt::Display> ResultExt for Result<T, E> {
-    type Ok = T;
-
-    fn to_wasm(self) -> Result<T, WasmFailErrorError> {
-        self.map_err(|e| WasmFailErrorError {
-            message: e.to_string(),
-        })
-    }
-}
-
-struct ComputationImpl<B: Board, P: string_art::Pipeline>(string_art::Computation<B, P>);
-
-impl<B: WasmBoard, P: WasmPipeline<B::Anchor>> Iterator for ComputationImpl<B, P> {
+impl<B: WasmBoard, P: WasmPipeline<B::Anchor>> Iterator for ComputationWrapper<B, P> {
     type Item = JsValue;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -205,7 +158,37 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn new(js_obj: JsValue) -> Result<Self, WasmFailErrorError> {
+    pub fn new(js_obj: JsValue) -> Result<Self, WasmError> {
         from_value(js_obj).to_wasm()
+    }
+}
+
+#[wasm_bindgen(getter_with_clone)]
+#[derive(Debug)]
+pub struct WasmError {
+    pub message: String,
+}
+
+impl core::fmt::Display for WasmError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl std::error::Error for WasmError {}
+
+pub trait ResultExt {
+    type Ok;
+
+    fn to_wasm(self) -> Result<Self::Ok, WasmError>;
+}
+
+impl<T, E: core::fmt::Display> ResultExt for Result<T, E> {
+    type Ok = T;
+
+    fn to_wasm(self) -> Result<T, WasmError> {
+        self.map_err(|e| WasmError {
+            message: e.to_string(),
+        })
     }
 }
