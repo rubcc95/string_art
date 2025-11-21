@@ -1,17 +1,12 @@
-import 'dart:typed_data';
-
 import 'package:string_art_gui/models/engine.dart';
+
+import 'basic_types.dart';
 
 class NativeEngine extends Engine {
   const NativeEngine();
 
   @override
-  Future<void> init() async {
-    throw UnimplementedError;
-  }
-
-  @override
-  Future<StepIterator> build(Settings settings, Uint8List image) {
+  Stream<Step> build(Settings settings) {
     // TODO: implement build
     throw UnimplementedError();
   }

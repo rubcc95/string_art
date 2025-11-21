@@ -62,7 +62,7 @@ class _ImagePageState extends State<ImagePage> {
                     MaterialPageRoute(
                       builder: (context) => ComputationPage(
                         widget.image,
-                        Computation(Settings(), widget.image.buffer),
+                        Computation(Settings(buffer: widget.image.buffer)),
                       ),
                     ),
                   ),

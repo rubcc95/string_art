@@ -1,19 +1,6 @@
 <!doctype html>
 <html>
     <head>
-        <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
         <base href="$FLUTTER_BASE_HREF" />
 
         <meta charset="UTF-8" />
@@ -34,21 +21,16 @@
     </head>
     <body>
         <script type="module">
-            import init, {
-                Point,
-                Segment,
-                Step,
-                Computation,
-                Settings,
-            } from "./pkg/string_art_bindings.js";
-
-            window.initWasm = init;
-
-            window.Point = Point;
-            window.Segment = Segment;
-            window.Step = Step;
-            window.Settings = Settings;
-            window.Computation = Computation;
+            class WebWorker {
+                constructor(message, computation) {
+                    var worker = new Worker("worker.js", { type: "module" });
+                    worker.onmessage = (e) => {
+                        message(e.data);
+                    };
+                    worker.postMessage(computation);
+                }
+            }
+            window.WebWorker = WebWorker;
         </script>
         <script src="flutter_bootstrap.js" async></script>
     </body>
