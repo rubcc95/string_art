@@ -10,21 +10,53 @@ class JsEngine extends Engine {
   const JsEngine();
 
   @override
-  Stream<Step> build(Settings settings) {
+  Future<Computation> build(Settings settings) async {
+    final completer = Completer<Size>();
     final controller = StreamController<Step>();
     WebWorker(
       ((JSObject raw) {
-        controller.add(raw.toStep);
+        if (completer.isCompleted) {
+          controller.add(raw.toStep);
+        } else {
+          completer.complete(raw.toSize);
+        }
       }).toJS,
       settings.toJS,
     );
-    return controller.stream;
+
+    return JsComputation(await completer.future, controller.stream);
+  }
+}
+
+class JsComputation with Stream<Step> implements Computation {
+  JsComputation(this.size, this._stream);
+
+  @override
+  final Size size;
+  final Stream<Step> _stream;
+
+  @override
+  StreamSubscription<Step> listen(
+    void Function(Step step)? onData, {
+    Function? onError,
+    void Function()? onDone,
+    bool? cancelOnError,
+  }) {
+    return _stream.listen(
+      onData,
+      onDone: onDone,
+      onError: onError,
+      cancelOnError: cancelOnError,
+    );
   }
 }
 
 extension on JSObject {
-  Point get toPoint {
-    return Point(0, 0);
+  Offset get toPoint {
+    return Offset(
+      getProperty<JSNumber>('x'.toJS).toDartDouble,
+      getProperty<JSNumber>('y'.toJS).toDartDouble,
+    );
   }
 
   Segment get toSegment {
@@ -40,6 +72,13 @@ extension on JSObject {
       link: getProperty<JSNumber>('link'.toJS).toDartInt,
       nail: getProperty<JSNumber>('nail'.toJS).toDartInt,
       segment: getProperty<JSObject>('segment'.toJS).toSegment,
+    );
+  }
+
+  Size get toSize {
+    return Size(
+      getProperty<JSNumber>('width'.toJS).toDartDouble,
+      getProperty<JSNumber>('height'.toJS).toDartDouble,
     );
   }
 }

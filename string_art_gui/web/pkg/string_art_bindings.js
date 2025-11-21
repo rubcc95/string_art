@@ -218,6 +218,16 @@ export class Computation {
         return this;
     }
     /**
+     * @returns {any}
+     */
+    rect() {
+        const ret = wasm.computation_rect(this.__wbg_ptr);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
      * @returns {any | undefined}
      */
     next() {
@@ -227,30 +237,30 @@ export class Computation {
 }
 if (Symbol.dispose) Computation.prototype[Symbol.dispose] = Computation.prototype.free;
 
-const WasmFailErrorErrorFinalization = (typeof FinalizationRegistry === 'undefined')
+const WasmErrorFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
-    : new FinalizationRegistry(ptr => wasm.__wbg_wasmfailerrorerror_free(ptr >>> 0, 1));
+    : new FinalizationRegistry(ptr => wasm.__wbg_wasmerror_free(ptr >>> 0, 1));
 
-export class WasmFailErrorError {
+export class WasmError {
 
     static __wrap(ptr) {
         ptr = ptr >>> 0;
-        const obj = Object.create(WasmFailErrorError.prototype);
+        const obj = Object.create(WasmError.prototype);
         obj.__wbg_ptr = ptr;
-        WasmFailErrorErrorFinalization.register(obj, obj.__wbg_ptr, obj);
+        WasmErrorFinalization.register(obj, obj.__wbg_ptr, obj);
         return obj;
     }
 
     __destroy_into_raw() {
         const ptr = this.__wbg_ptr;
         this.__wbg_ptr = 0;
-        WasmFailErrorErrorFinalization.unregister(this);
+        WasmErrorFinalization.unregister(this);
         return ptr;
     }
 
     free() {
         const ptr = this.__destroy_into_raw();
-        wasm.__wbg_wasmfailerrorerror_free(ptr, 0);
+        wasm.__wbg_wasmerror_free(ptr, 0);
     }
     /**
      * @returns {string}
@@ -259,7 +269,7 @@ export class WasmFailErrorError {
         let deferred1_0;
         let deferred1_1;
         try {
-            const ret = wasm.__wbg_get_wasmfailerrorerror_message(this.__wbg_ptr);
+            const ret = wasm.__wbg_get_wasmerror_message(this.__wbg_ptr);
             deferred1_0 = ret[0];
             deferred1_1 = ret[1];
             return getStringFromWasm0(ret[0], ret[1]);
@@ -273,10 +283,10 @@ export class WasmFailErrorError {
     set message(arg0) {
         const ptr0 = passStringToWasm0(arg0, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
-        wasm.__wbg_set_wasmfailerrorerror_message(this.__wbg_ptr, ptr0, len0);
+        wasm.__wbg_set_wasmerror_message(this.__wbg_ptr, ptr0, len0);
     }
 }
-if (Symbol.dispose) WasmFailErrorError.prototype[Symbol.dispose] = WasmFailErrorError.prototype.free;
+if (Symbol.dispose) WasmError.prototype[Symbol.dispose] = WasmError.prototype.free;
 
 const EXPECTED_RESPONSE_TYPES = new Set(['basic', 'cors', 'default']);
 
@@ -481,8 +491,8 @@ function __wbg_get_imports() {
         const ret = arg0.value;
         return ret;
     };
-    imports.wbg.__wbg_wasmfailerrorerror_new = function(arg0) {
-        const ret = WasmFailErrorError.__wrap(arg0);
+    imports.wbg.__wbg_wasmerror_new = function(arg0) {
+        const ret = WasmError.__wrap(arg0);
         return ret;
     };
     imports.wbg.__wbindgen_cast_2241b6af4c4b2941 = function(arg0, arg1) {

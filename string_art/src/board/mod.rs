@@ -45,8 +45,6 @@ pub trait Board {
     fn get_line(&self, index: Self::LineId) -> &Line;
 
     fn get_line_mut(&mut self, index: Self::LineId) -> &mut Line;
-
-    //fn get_anchor(&self, id: Self::AnchorId) -> Self::Anchor;
 }
 
 impl<B: Board> Board for &mut B {
@@ -73,10 +71,6 @@ impl<B: Board> Board for &mut B {
     fn get_line_mut(&mut self, index: Self::LineId) -> &mut Line {
         B::get_line_mut(*self, index)
     }
-
-    // fn get_anchor(&self, id: Self::AnchorId) -> Self::Anchor {
-    //     B::get_anchor(*self, id)
-    // }
 }
 
 #[derive(Clone, Debug, Deref)]

@@ -136,6 +136,10 @@ impl<F: Frac> Pipeline for Monocolor<F> {
     fn next<A>(runtime: &mut Self::Runtime<A>) -> Option<Self::Layer<'_, A>> {
         Some(runtime)
     }
+
+    fn rect<A>(runtime: &Self::Runtime<A>) -> string_art_geometry::Rect<u32> {
+        runtime.monocolor.grid.rect().as_()
+    }
 }
 
 pub struct MonocolorRuntime<A, F> {

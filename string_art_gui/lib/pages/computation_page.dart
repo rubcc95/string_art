@@ -2,76 +2,48 @@ import 'dart:async';
 import 'package:flutter/material.dart' hide Step;
 
 import '../models/computation.dart';
+import '../models/engine.dart';
 import '../models/image_data.dart';
-import '../models/basic_types.dart' show Step;
+import '../models/basic_types.dart';
 
-/// Page that displays a full-size image while a computation runs.
-/// At the bottom it shows three icon buttons. On each computation [Step]
-/// it calls [_callWhenStep].
 class ComputationPage extends StatefulWidget {
   const ComputationPage(this.image, this.computation, {super.key});
 
   final ImageData image;
-  final Computation computation;
+  final Future<Computation> computation;
 
   @override
   State<ComputationPage> createState() => _ComputationPageState();
 }
 
 class _ComputationPageState extends State<ComputationPage> {
-  StreamSubscription<Step>? _stepSub;
-  Step? _lastStep;
+  Computation? _computation;
+  late final StreamSubscription<Step> _stepSub;
+  final List<Step> _steps = [];
 
   @override
   void initState() {
     super.initState();
-    _listenSteps();
-  }
 
-  void _listenSteps() {
-    _stepSub = widget.computation.stepListener.listen(
-      (step) {
-        _lastStep = step;
-        _callWhenStep(context, step);
-      },
-      onError: (err, st) {
-        print('Computation error: $err');
-      },
-      onDone: () {
-        print('Computation finished.');
-      },
-      cancelOnError: false,
-    );
+    widget.computation.then((cmp) {
+      setState(() => _computation = cmp);
+      cmp.listen(
+        (step) => setState(() => _steps.add(step)),
+        onError: (err, st) {
+          print('Computation error: $err');
+        },
+        onDone: () {
+          print('Computation finished.');
+        },
+        cancelOnError: true,
+      );
+    });
   }
 
   @override
   void dispose() {
-    _stepSub?.cancel();
+    _stepSub.cancel();
     super.dispose();
-  }
-
-  void _callWhenStep(BuildContext context, Step step) {
-    print('''Received step: {
-      link: ${step.link},
-      nail: ${step.link},
-      color: ${step.color},
-      segment: {
-        start: {
-          x: ${step.segment.start.x},
-          y: ${step.segment.start.y}
-        },
-        end: {
-          x: ${step.segment.end.x},
-          y: ${step.segment.end.y}
-        }
-      }
-    }''');
-  }
-
-  Widget _buildImageArea() {
-    return const Center(
-      child: Text('FULL IMAGE HERE', style: TextStyle(fontSize: 18)),
-    );
   }
 
   Widget _buildBottomButtons() {
@@ -125,8 +97,38 @@ class _ComputationPageState extends State<ComputationPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _buildImageArea(),
+      body: _computation == null
+          ? Center(child: CircularProgressIndicator())
+          : CustomPaint(
+              size: MediaQuery.of(context).size,
+              painter: LinePainter(size: _computation!.size, steps: _steps),
+            ),
       bottomNavigationBar: _buildBottomButtons(),
     );
+  }
+}
+
+class LinePainter extends CustomPainter {
+  final List<Step> steps;
+  final Size size;
+
+  LinePainter({required this.steps, Size? size}) : size = size ?? Size(0, 0);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.scale(size.width / this.size.width, size.height / this.size.height);
+    final paint = Paint()
+      ..color = Colors.black
+      ..strokeWidth = 0.2
+      ..style = PaintingStyle.stroke;
+
+    for (var step in steps) {
+      canvas.drawLine(step.segment.start, step.segment.end, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) {
+    return true;
   }
 }

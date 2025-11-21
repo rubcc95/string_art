@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:string_art_gui/models/js_engine.dart';
 import 'package:string_art_gui/models/native_engine.dart';
 
@@ -13,7 +14,11 @@ abstract class Engine {
 
   const Engine();
 
-  Stream<Step> build(Settings settings);
+  Future<Computation> build(Settings settings);
+}
+
+abstract mixin class Computation implements Stream<Step> {
+  Size get size;
 }
 
 class Settings {
