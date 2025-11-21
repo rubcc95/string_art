@@ -35,10 +35,10 @@ class _ComputationPageState extends State<ComputationPage> {
         _callWhenStep(context, step);
       },
       onError: (err, st) {
-        debugPrint('Computation error: $err');
+        print('Computation error: $err');
       },
       onDone: () {
-        debugPrint('Computation finished.');
+        print('Computation finished.');
       },
       cancelOnError: false,
     );
@@ -51,7 +51,21 @@ class _ComputationPageState extends State<ComputationPage> {
   }
 
   void _callWhenStep(BuildContext context, Step step) {
-    debugPrint('Received step: $step');
+    print('''Received step: {
+      link: ${step.link},
+      nail: ${step.link},
+      color: ${step.color},
+      segment: {
+        start: {
+          x: ${step.segment.start.x},
+          y: ${step.segment.start.y}
+        },
+        end: {
+          x: ${step.segment.end.x},
+          y: ${step.segment.end.y}
+        }
+      }
+    }''');
   }
 
   Widget _buildImageArea() {

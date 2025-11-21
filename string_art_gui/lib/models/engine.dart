@@ -13,13 +13,12 @@ abstract class Engine {
 
   const Engine();
 
-  Future<void> init();
-
-  Future<StepIterator> build(Settings settings, Uint8List image);
+  Stream<Step> build(Settings settings);
 }
 
 class Settings {
   Settings({
+    required this.buffer,
     this.decay = 0.15,
     this.minNailDistance = 20,
     this.nailCount = 512,
@@ -30,4 +29,5 @@ class Settings {
   int minNailDistance;
   int nailCount;
   double circularNailRadius;
+  Uint8List buffer;
 }

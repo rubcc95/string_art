@@ -1,60 +1,63 @@
-use string_art::{Board, ValidPipelineLayer, board::ValidBoard, geometry, math::Frac16, nails};
+use serde::{Deserialize, Serialize};
+use serde_wasm_bindgen::{from_value, to_value};
+use string_art::{
+    Board, ValidPipelineLayer, board::ValidBoard, geometry::Segment, math::Frac16, nails,
+};
 use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Serialize, Deserialize)]
 pub struct Step {
     pub color: u32,
-    pub segment: Segment,
+    pub segment: Segment<f32>,
     pub nail: usize,
     pub link: u8,
 }
 
-#[wasm_bindgen]
-#[derive(Copy, Clone)]
-pub struct Segment(geometry::Segment<f32>);
+// #[wasm_bindgen]
+// #[derive(Copy, Clone, Serialize, Deserialize)]
+// pub struct Segment(geometry::Segment<f32>);
+
+// #[wasm_bindgen]
+// impl Segment {
+//     #[wasm_bindgen(getter)]
+//     pub fn start(&self) -> Point {
+//         Point(self.0.start)
+//     }
+
+//     #[wasm_bindgen(getter)]
+//     pub fn end(&self) -> Point {
+//         Point(self.0.end)
+//     }
+// }
+
+// #[wasm_bindgen]
+// #[derive(Copy, Clone, Serialize, Deserialize)]
+// pub struct Point(geometry::Point<f32>);
+
+// #[wasm_bindgen]
+// impl Point {
+//     #[wasm_bindgen(getter)]
+//     pub fn x(&self) -> f32 {
+//         self.0.x
+//     }
+
+//     #[wasm_bindgen(getter)]
+//     pub fn y(&self) -> f32 {
+//         self.0.y
+//     }
+// }
 
 #[wasm_bindgen]
-impl Segment {
-    #[wasm_bindgen(getter)]
-    pub fn start(&self) -> Point {
-        Point(self.0.start)
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn end(&self) -> Point {
-        Point(self.0.end)
-    }
-}
+pub struct Computation(Box<dyn Iterator<Item = JsValue>>);
 
 #[wasm_bindgen]
-#[derive(Copy, Clone)]
-pub struct Point(geometry::Point<f32>);
-
-#[wasm_bindgen]
-impl Point {
-    #[wasm_bindgen(getter)]
-    pub fn x(&self) -> f32 {
-        self.0.x
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn y(&self) -> f32 {
-        self.0.y
-    }
-}
-
-#[wasm_bindgen]
-pub struct Computation(Box<dyn Iterator<Item = Step>>);
-
 impl Computation {
-    pub fn new<B: WasmBoard, P: WasmPipeline<B::Anchor>>(
-        settings: &Settings,
-        image_buffer: &[u8],
-        decay: f32,
-    ) -> Result<Self, WasmError> {
-        let pipeline =
-            string_art::Monocolor::from_image(&image::load_from_memory(image_buffer).to_wasm()?);
+    #[wasm_bindgen(constructor)]
+    pub fn new(settings: JsValue) -> Result<Self, WasmFailErrorError> {
+        let settings = Settings::new(settings)?;
+        let pipeline = string_art::Monocolor::from_image(
+            &image::load_from_memory(&settings.buffer).to_wasm()?,
+        );
         let board = string_art::ellipse::Ellipse::new(
             pipeline.rect().as_(),
             string_art::nails::UniformCircular(settings.circular_nail_radius),
@@ -66,34 +69,41 @@ impl Computation {
             string_art::computation::Computation::new(
                 pipeline,
                 board,
-                Frac16::from_bits((u16::MAX as f32 * decay) as u16),
+                Frac16::from_bits((u16::MAX as f32 * settings.decay) as u16),
             ),
         ))))
     }
-}
-#[wasm_bindgen]
-impl Computation {
-    pub fn next(&mut self) -> Option<Step> {
+
+    pub fn next(&mut self) -> Option<JsValue> {
         self.0.next()
     }
 }
 
 #[wasm_bindgen(getter_with_clone)]
-pub struct WasmError {
+#[derive(Debug)]
+pub struct WasmFailErrorError {
     pub message: String,
 }
+
+impl core::fmt::Display for WasmFailErrorError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl std::error::Error for WasmFailErrorError {}
 
 pub trait ResultExt {
     type Ok;
 
-    fn to_wasm(self) -> Result<Self::Ok, WasmError>;
+    fn to_wasm(self) -> Result<Self::Ok, WasmFailErrorError>;
 }
 
 impl<T, E: core::fmt::Display> ResultExt for Result<T, E> {
     type Ok = T;
 
-    fn to_wasm(self) -> Result<T, WasmError> {
-        self.map_err(|e| WasmError {
+    fn to_wasm(self) -> Result<T, WasmFailErrorError> {
+        self.map_err(|e| WasmFailErrorError {
             message: e.to_string(),
         })
     }
@@ -102,14 +112,19 @@ impl<T, E: core::fmt::Display> ResultExt for Result<T, E> {
 struct ComputationImpl<B: Board, P: string_art::Pipeline>(string_art::Computation<B, P>);
 
 impl<B: WasmBoard, P: WasmPipeline<B::Anchor>> Iterator for ComputationImpl<B, P> {
-    type Item = Step;
+    type Item = JsValue;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.0.next().map(|step| Step {
-            color: step.layer.to_color(),
-            segment: Segment(step.segment),
-            nail: step.anchor.anchor_idx(),
-            link: step.anchor.link_idx(),
+        self.0.next().map(|step| {
+            {
+                to_value(&Step {
+                    color: step.layer.to_color(),
+                    segment: step.segment,
+                    nail: step.anchor.anchor_idx(),
+                    link: step.anchor.link_idx(),
+                })
+            }
+            .unwrap()
         })
     }
 }
@@ -177,53 +192,20 @@ impl WasmLink for nails::point::Link {
     }
 }
 
-#[wasm_bindgen]
+#[derive(Serialize, Deserialize)]
 pub struct Settings {
     pub decay: f32,
+    #[serde(rename = "minNailDistance")]
     min_nail_distance: usize,
+    #[serde(rename = "nailCount")]
     nail_count: usize,
+    #[serde(rename = "circularNailRadius")]
     circular_nail_radius: f32,
+    buffer: Vec<u8>,
 }
 
-#[wasm_bindgen]
 impl Settings {
-    #[wasm_bindgen(constructor)]
-    pub fn new() -> Self {
-        Self {
-            decay: 0.1,
-            min_nail_distance: 20,
-            nail_count: 512,
-            circular_nail_radius: 0.2,
-        }
-    }
-
-    #[wasm_bindgen(getter, js_name = minNailDistance)]
-    pub fn min_nail_distance(&self) -> usize {
-        self.min_nail_distance
-    }
-
-    #[wasm_bindgen(setter, js_name = minNailDistance)]
-    pub fn set_min_nail_distance(&mut self, distance: usize) {
-        self.min_nail_distance = distance;
-    }
-
-    #[wasm_bindgen(getter, js_name = nailCount)]
-    pub fn nail_count(&self) -> usize {
-        self.nail_count
-    }
-
-    #[wasm_bindgen(setter, js_name = nailCount)]
-    pub fn set_nail_count(&mut self, count: usize) {
-        self.nail_count = count;
-    }
-
-    #[wasm_bindgen(getter, js_name = circularNailRadius)]
-    pub fn circular_nail_radius(&self) -> f32 {
-        self.circular_nail_radius
-    }
-
-    #[wasm_bindgen(setter, js_name = circularNailRadius)]
-    pub fn set_circular_nail_radius(&mut self, radius: f32) {
-        self.circular_nail_radius = radius;
+    pub fn new(js_obj: JsValue) -> Result<Self, WasmFailErrorError> {
+        from_value(js_obj).to_wasm()
     }
 }

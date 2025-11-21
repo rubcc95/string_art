@@ -1,44 +1,12 @@
 /* tslint:disable */
 /* eslint-disable */
 export class Computation {
-  private constructor();
   free(): void;
   [Symbol.dispose](): void;
-  next(): Step | undefined;
+  constructor(settings: any);
+  next(): any | undefined;
 }
-export class Point {
-  private constructor();
-  free(): void;
-  [Symbol.dispose](): void;
-  readonly x: number;
-  readonly y: number;
-}
-export class Segment {
-  private constructor();
-  free(): void;
-  [Symbol.dispose](): void;
-  readonly start: Point;
-  readonly end: Point;
-}
-export class Settings {
-  free(): void;
-  [Symbol.dispose](): void;
-  constructor();
-  decay: number;
-  minNailDistance: number;
-  nailCount: number;
-  circularNailRadius: number;
-}
-export class Step {
-  private constructor();
-  free(): void;
-  [Symbol.dispose](): void;
-  color: number;
-  segment: Segment;
-  nail: number;
-  link: number;
-}
-export class WasmError {
+export class WasmFailErrorError {
   private constructor();
   free(): void;
   [Symbol.dispose](): void;
@@ -49,40 +17,19 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
-  readonly __wbg_step_free: (a: number, b: number) => void;
-  readonly __wbg_get_step_color: (a: number) => number;
-  readonly __wbg_set_step_color: (a: number, b: number) => void;
-  readonly __wbg_get_step_segment: (a: number) => number;
-  readonly __wbg_set_step_segment: (a: number, b: number) => void;
-  readonly __wbg_get_step_nail: (a: number) => number;
-  readonly __wbg_set_step_nail: (a: number, b: number) => void;
-  readonly __wbg_get_step_link: (a: number) => number;
-  readonly __wbg_set_step_link: (a: number, b: number) => void;
-  readonly __wbg_segment_free: (a: number, b: number) => void;
-  readonly segment_start: (a: number) => number;
-  readonly segment_end: (a: number) => number;
-  readonly __wbg_point_free: (a: number, b: number) => void;
-  readonly point_x: (a: number) => number;
-  readonly point_y: (a: number) => number;
   readonly __wbg_computation_free: (a: number, b: number) => void;
-  readonly computation_next: (a: number) => number;
-  readonly __wbg_wasmerror_free: (a: number, b: number) => void;
-  readonly __wbg_get_wasmerror_message: (a: number) => [number, number];
-  readonly __wbg_set_wasmerror_message: (a: number, b: number, c: number) => void;
-  readonly __wbg_settings_free: (a: number, b: number) => void;
-  readonly __wbg_get_settings_decay: (a: number) => number;
-  readonly __wbg_set_settings_decay: (a: number, b: number) => void;
-  readonly settings_new: () => number;
-  readonly settings_minNailDistance: (a: number) => number;
-  readonly settings_set_minNailDistance: (a: number, b: number) => void;
-  readonly settings_nailCount: (a: number) => number;
-  readonly settings_set_nailCount: (a: number, b: number) => void;
-  readonly settings_circularNailRadius: (a: number) => number;
-  readonly settings_set_circularNailRadius: (a: number, b: number) => void;
-  readonly __wbindgen_externrefs: WebAssembly.Table;
-  readonly __wbindgen_free: (a: number, b: number, c: number) => void;
+  readonly computation_new: (a: any) => [number, number, number];
+  readonly computation_next: (a: number) => any;
+  readonly __wbg_wasmfailerrorerror_free: (a: number, b: number) => void;
+  readonly __wbg_get_wasmfailerrorerror_message: (a: number) => [number, number];
+  readonly __wbg_set_wasmfailerrorerror_message: (a: number, b: number, c: number) => void;
   readonly __wbindgen_malloc: (a: number, b: number) => number;
   readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
+  readonly __wbindgen_exn_store: (a: number) => void;
+  readonly __externref_table_alloc: () => number;
+  readonly __wbindgen_externrefs: WebAssembly.Table;
+  readonly __externref_table_dealloc: (a: number) => void;
+  readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __wbindgen_start: () => void;
 }
 
