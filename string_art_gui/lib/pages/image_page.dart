@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:string_art_gui/models/image_data.dart';
 import 'package:string_art_gui/pages/computation_page.dart';
-
-import '../models/computation.dart';
+import 'package:string_art_gui/widgets/slider.dart';
 import '../models/engine.dart';
 
 class ImagePage extends StatefulWidget {
@@ -25,24 +24,35 @@ class _ImagePageState extends State<ImagePage> {
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
+                spacing: 16,
                 children: [
-                  TextField(
-                    decoration: const InputDecoration(labelText: "Field 1"),
+                  Row(
+                    spacing: 16,
+                    children: [
+                      Expanded(
+                        child: SliderNumFieldForm.double(
+                          min: 0.05,
+                          max: 5,
+                          initialValue: 0.5,
+                          label: "Nail Radius",
+                        ),
+                      ),
+                      Expanded(
+                        child: SliderNumFieldForm.int(
+                          min: 2,
+                          max: 1024,
+                          initialValue: 512,
+                          label: "Nail Count",
+                          step: 1,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    decoration: const InputDecoration(labelText: "Field 2"),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    decoration: const InputDecoration(labelText: "Field 3"),
-                  ),
-                  const SizedBox(height: 16),
                   for (int i = 4; i < 20; i++)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: TextField(
-                        decoration: InputDecoration(labelText: "Field $i"),
+                    TextField(
+                      decoration: InputDecoration(
+                        labelText: "Field $i",
+                        border: OutlineInputBorder(),
                       ),
                     ),
                 ],
@@ -54,17 +64,19 @@ class _ImagePageState extends State<ImagePage> {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.all(12),
-              itemCount: 10,
+              itemCount: widget.image.computations.length,
               separatorBuilder: (_, __) => const SizedBox(width: 12),
               itemBuilder: (context, index) {
+                final computation = widget.image.computations[index];
                 return InkWell(
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (context) => ComputationPage(
                         widget.image,
-                        Engine.instance.build(
-                          Settings(buffer: widget.image.buffer),
-                        ),
+                        computation,
+                        // Engine.instance.build(
+                        //   Settings(buffer: widget.image.buffer),
+                        // ),
                       ),
                     ),
                   ),
