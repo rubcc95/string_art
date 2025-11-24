@@ -1,13 +1,14 @@
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen::{from_value, to_value};
 use string_art::{
-    Board, ValidPipelineLayer,
+    Board, Color32, ValidPipelineLayer,
     board::ValidBoard,
-    geometry::{Rect, Segment},
+    geometry::{Circle, Rect, Segment},
     math::Frac16,
     nails,
 };
 use wasm_bindgen::prelude::*;
+use web_sys::js_sys::Function;
 
 #[derive(Copy, Clone, Serialize, Deserialize)]
 pub struct Step {
@@ -27,13 +28,14 @@ impl Computation {
         let pipeline = string_art::Monocolor::from_image(
             &image::load_from_memory(&settings.buffer).to_wasm()?,
         );
-        let board = string_art::ellipse::Ellipse::new(
+        let ellipse = string_art::Ellipse::new(
             pipeline.rect().as_(),
             string_art::nails::UniformCircular(settings.circular_nail_radius),
             settings.nail_count,
-            settings.min_nail_distance,
-        )
-        .to_wasm()?;
+        );
+
+        let board =
+            string_art::ellipse::Board::new(&ellipse, settings.min_nail_distance).to_wasm()?;
         Ok(Self(Box::new(ComputationWrapper(
             string_art::computation::Computation::new(
                 pipeline,
@@ -149,12 +151,12 @@ impl WasmLink for nails::point::Link {
 pub struct Settings {
     pub decay: f32,
     #[serde(rename = "minNailDistance")]
-    min_nail_distance: usize,
+    pub min_nail_distance: usize,
     #[serde(rename = "nailCount")]
-    nail_count: usize,
+    pub nail_count: usize,
     #[serde(rename = "circularNailRadius")]
-    circular_nail_radius: f32,
-    buffer: Vec<u8>,
+    pub circular_nail_radius: f32,
+    pub buffer: Vec<u8>,
 }
 
 impl Settings {
@@ -191,4 +193,75 @@ impl<T, E: core::fmt::Display> ResultExt for Result<T, E> {
             message: e.to_string(),
         })
     }
+}
+
+#[wasm_bindgen]
+pub struct DrawBackend {
+    draw_circle: JsValue,
+    draw_circunference: JsValue,
+    draw_segment: JsValue,
+}
+
+#[wasm_bindgen]
+impl DrawBackend {
+    #[wasm_bindgen(constructor)]
+    pub fn new(draw_circle: JsValue, draw_circunference: JsValue, draw_segment: JsValue) -> Self {
+        Self {
+            draw_circle,
+            draw_circunference,
+            draw_segment,
+        }
+    }
+}
+
+impl DrawBackend {
+    fn call_js(&self, f: &JsValue, args: &[JsValue]) {
+        let func: &Function = f.dyn_ref().expect("Expected a JS function");
+        func.apply(
+            &JsValue::NULL,
+            &web_sys::js_sys::Array::from_iter(args.iter()),
+        )
+        .expect("JS call failed");
+    }
+}
+
+impl string_art::DrawBackend for DrawBackend {
+    fn draw_circle(&mut self, circle: Circle<f32>, color: impl Color32) {
+        self.call_js(
+            &self.draw_circle,
+            &[
+                to_value(&circle.center).unwrap(),
+                to_value(&circle.radius).unwrap(),
+                to_value(&color_to_int(&color)).unwrap(),
+            ],
+        );
+    }
+
+    fn draw_circunference(&mut self, circle: Circle<f32>, stroke: f32, color: impl Color32) {
+        self.call_js(
+            &self.draw_circunference,
+            &[
+                to_value(&circle.center).unwrap(),
+                to_value(&circle.radius).unwrap(),
+                to_value(&stroke).unwrap(),
+                to_value(&color_to_int(&color)).unwrap(),
+            ],
+        );
+    }
+
+    fn draw_segment(&mut self, segment: Segment<f32>, stroke: f32, color: impl Color32) {
+        self.call_js(
+            &self.draw_segment,
+            &[
+                to_value(&segment).unwrap(),
+                to_value(&stroke).unwrap(),
+                to_value(&color_to_int(&color)).unwrap(),
+            ],
+        );
+    }
+}
+
+fn color_to_int(color: &impl Color32) -> u32 {
+    let [r, g, b] = color.rgb();
+    ((r as u32) << 16) | ((g as u32) << 8) | (b as u32)
 }

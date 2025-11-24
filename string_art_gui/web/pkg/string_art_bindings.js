@@ -237,6 +237,37 @@ export class Computation {
 }
 if (Symbol.dispose) Computation.prototype[Symbol.dispose] = Computation.prototype.free;
 
+const DrawBackendFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_drawbackend_free(ptr >>> 0, 1));
+
+export class DrawBackend {
+
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        DrawBackendFinalization.unregister(this);
+        return ptr;
+    }
+
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_drawbackend_free(ptr, 0);
+    }
+    /**
+     * @param {any} draw_circle
+     * @param {any} draw_circunference
+     * @param {any} draw_segment
+     */
+    constructor(draw_circle, draw_circunference, draw_segment) {
+        const ret = wasm.drawbackend_new(draw_circle, draw_circunference, draw_segment);
+        this.__wbg_ptr = ret >>> 0;
+        DrawBackendFinalization.register(this, this.__wbg_ptr, this);
+        return this;
+    }
+}
+if (Symbol.dispose) DrawBackend.prototype[Symbol.dispose] = DrawBackend.prototype.free;
+
 const WasmErrorFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_wasmerror_free(ptr >>> 0, 1));

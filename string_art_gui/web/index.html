@@ -30,6 +30,8 @@
                     worker.postMessage(computation);
                 }
             }
+
+            window.DrawBackend = DrawBackend;
             window.WebWorker = WebWorker;
         </script>
         <script src="flutter_bootstrap.js" async></script>

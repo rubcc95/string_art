@@ -5,6 +5,7 @@ import 'package:flutter/material.dart' hide Step;
 import '../models/engine.dart';
 import '../models/image_data.dart';
 import '../models/basic_types.dart';
+import '../models/draw_backend.dart';
 
 class ComputationPage extends StatefulWidget {
   const ComputationPage(this.image, this.computation, {super.key});
@@ -129,6 +130,41 @@ class _ComputationPageState extends State<ComputationPage> {
             ),
       bottomNavigationBar: _buildBottomButtons(),
     );
+  }
+}
+
+class CanvasDrawBackend with DrawBackend {
+  Canvas _canvas;
+  Paint _paint = Paint();
+
+  CanvasDrawBackend(this._canvas);
+
+  @override
+  void drawCircle(Offset offset, double radius, Color color) {
+    _paint.color = color;
+    _paint.style = PaintingStyle.fill;
+    _canvas.drawCircle(offset, radius, _paint);
+  }
+
+  @override
+  void drawCircunference(
+    Offset offset,
+    double radius,
+    double stroke,
+    Color color,
+  ) {
+    _paint.color = color;
+    _paint.style = PaintingStyle.stroke;
+    _paint.strokeWidth = stroke;
+    _canvas.drawCircle(offset, radius, _paint);
+  }
+
+  @override
+  void drawSegment(Segment segment, double stroke, Color color) {
+    _paint.color = color;
+    _paint.style = PaintingStyle.stroke;
+    _paint.strokeWidth = stroke;
+    _canvas.drawLine(segment.start, segment.end, _paint);
   }
 }
 

@@ -3,6 +3,8 @@ import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 import 'dart:ui';
 
+import 'package:string_art_gui/models/draw_backend.dart';
+
 import 'basic_types.dart';
 import 'engine.dart';
 
@@ -98,4 +100,54 @@ extension on Settings {
 @JS()
 extension type WebWorker._(JSObject _obj) {
   external factory WebWorker(JSFunction message, JSObject settings);
+}
+
+extension type JsDrawBackendInterpreter(DrawBackend _dartDrawBackend) {
+  void drawSegment(JSObject segment, JSNumber stroke, JSNumber color) {
+    _dartDrawBackend.drawSegment(
+      segment.toSegment,
+      stroke.toDartDouble,
+      Color(color.toDartInt),
+    );
+  }
+
+  void drawCircle(JSObject offset, JSNumber radius, JSNumber color) {
+    _dartDrawBackend.drawCircle(
+      offset.toPoint,
+      radius.toDartDouble,
+      Color(color.toDartInt),
+    );
+  }
+
+  void drawCircunference(
+    JSObject offset,
+    JSNumber radius,
+    JSNumber stroke,
+    JSNumber color,
+  ) {
+    _dartDrawBackend.drawCircunference(
+      offset.toPoint,
+      radius.toDartDouble,
+      stroke.toDartDouble,
+      Color(color.toDartInt),
+    );
+  }
+}
+
+@JS("DrawBackend")
+extension type JSDrawBackend._(JSObject _obj) {
+  factory JSDrawBackend.fromDart(DrawBackend backend) {
+    final interpreter = JsDrawBackendInterpreter(backend);
+    return JSDrawBackend(
+      interpreter.drawCircle.toJS,
+      interpreter.drawCircunference.toJS,
+      interpreter.drawSegment.toJS,
+    );
+  }
+
+  external factory JSDrawBackend(
+    JSFunction drawCircle,
+    JSFunction drawCircunference,
+    JSFunction drawSegment,
+  );
 }
