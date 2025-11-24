@@ -10,7 +10,7 @@ impl nails::Builder for UniformCircular {
 
     type Links = Links;
 
-    type Handle = Self;
+    type Handle = Handle;
 
     type Link = Direction;
 
@@ -22,7 +22,7 @@ impl nails::Builder for UniformCircular {
         position
     }
 
-    fn create_segment(
+    fn link_nails(
         &self,
         start: (&Self::Nail, Self::Link),
         end: (&Self::Nail, Self::Link),
@@ -42,8 +42,8 @@ impl nails::Builder for UniformCircular {
         .ok_or(Error)
     }
 
-    fn anchor_builder(self) -> Self::Handle {
-        self
+    fn to_handle(&self) -> Self::Handle {
+        Handle
     }
 }
 
@@ -97,7 +97,7 @@ impl Direction {
         Self(circle::Direction::CounterClockWise),
     ];
 
-    pub fn reversed(self) -> Self{
+    pub fn reversed(self) -> Self {
         match self.0 {
             circle::Direction::ClockWise => Self::COUNTER_CLOCK_WISE,
             circle::Direction::CounterClockWise => Self::CLOCK_WISE,
@@ -126,7 +126,10 @@ impl TryFrom<usize> for Direction {
 #[error("Index {0} is out of range")]
 pub struct FromIndexError(usize);
 
-impl nails::Handle for UniformCircular {
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Handle;
+
+impl nails::Handle for Handle {
     type Nail = Point<f32>;
     type Link = Direction;
 
@@ -140,7 +143,7 @@ impl nails::Handle for UniformCircular {
             circle::Direction::CounterClockWise => 1,
         }
     }
-    
+
     fn reversed(&self, mut anchor: nails::Anchor<Self::Link>) -> nails::Anchor<Self::Link> {
         anchor.link = anchor.link.reversed();
         anchor
@@ -165,14 +168,14 @@ mod tests {
         let p2 = Point::new(4.0, 0.0);
 
         let clock_to_clock = circular
-            .create_segment((&p1, Direction::CLOCK_WISE), (&p2, Direction::CLOCK_WISE))
+            .link_nails((&p1, Direction::CLOCK_WISE), (&p2, Direction::CLOCK_WISE))
             .expect("Should create CW tangent");
 
         assert!(clock_to_clock.start.y > 0.0);
         assert!(clock_to_clock.end.y > 0.0);
 
         let counter_to_counter = circular
-            .create_segment(
+            .link_nails(
                 (&p1, Direction::COUNTER_CLOCK_WISE),
                 (&p2, Direction::COUNTER_CLOCK_WISE),
             )
@@ -182,7 +185,7 @@ mod tests {
         assert!(counter_to_counter.end.y < 0.0);
 
         let clock_to_counter = circular
-            .create_segment(
+            .link_nails(
                 (&p1, Direction::CLOCK_WISE),
                 (&p2, Direction::COUNTER_CLOCK_WISE),
             )
@@ -192,7 +195,7 @@ mod tests {
         assert!(clock_to_counter.end.y < 0.0);
 
         let counter_to_clock = circular
-            .create_segment(
+            .link_nails(
                 (&p1, Direction::COUNTER_CLOCK_WISE),
                 (&p2, Direction::CLOCK_WISE),
             )
@@ -202,14 +205,14 @@ mod tests {
         assert!(counter_to_clock.end.y > 0.0);
 
         let clock_to_clock = circular
-            .create_segment((&p2, Direction::CLOCK_WISE), (&p1, Direction::CLOCK_WISE))
+            .link_nails((&p2, Direction::CLOCK_WISE), (&p1, Direction::CLOCK_WISE))
             .expect("Should create CW tangent");
 
         assert!(clock_to_clock.start.y < 0.0);
         assert!(clock_to_clock.end.y < 0.0);
 
         let counter_to_counter = circular
-            .create_segment(
+            .link_nails(
                 (&p2, Direction::COUNTER_CLOCK_WISE),
                 (&p1, Direction::COUNTER_CLOCK_WISE),
             )
@@ -219,7 +222,7 @@ mod tests {
         assert!(counter_to_counter.end.y > 0.0);
 
         let clock_to_counter = circular
-            .create_segment(
+            .link_nails(
                 (&p2, Direction::COUNTER_CLOCK_WISE),
                 (&p1, Direction::CLOCK_WISE),
             )
@@ -229,7 +232,7 @@ mod tests {
         assert!(clock_to_counter.end.y < 0.0);
 
         let counter_to_clock = circular
-            .create_segment(
+            .link_nails(
                 (&p2, Direction::CLOCK_WISE),
                 (&p1, Direction::COUNTER_CLOCK_WISE),
             )

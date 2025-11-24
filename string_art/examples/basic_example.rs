@@ -9,13 +9,13 @@ fn main() {
 
     let monocolor = Monocolor::from_image(&image::load_from_memory(&[]).unwrap());
 
-    let board = Ellipse::new(
+    let ellipse = Ellipse::new(
         Rect::new(image.width() as f32, image.height() as f32),
         nails::UniformCircular(0.2),
         512,
-        20,
-    )
-    .unwrap();
+    );
+
+    let board = ellipse::Board::new(&ellipse, 16).unwrap();
 
     for step in Computation::new(monocolor, board, Frac16::from_bits(5000)) {
         println!(

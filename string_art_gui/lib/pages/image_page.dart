@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:string_art_gui/models/image_data.dart';
 import 'package:string_art_gui/pages/computation_page.dart';
 import 'package:string_art_gui/widgets/slider.dart';
+
 import '../models/engine.dart';
 
 class ImagePage extends StatefulWidget {
@@ -14,6 +15,15 @@ class ImagePage extends StatefulWidget {
 }
 
 class _ImagePageState extends State<ImagePage> {
+  late Settings _settings;
+  final _minNailDistanceController = SliderNumController<int>();
+
+  @override
+  void initState() {
+    super.initState();
+    _settings = Settings(buffer: widget.image.buffer);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -35,6 +45,7 @@ class _ImagePageState extends State<ImagePage> {
                           max: 5,
                           initialValue: 0.5,
                           label: "Nail Radius",
+                          onChange: (d) => _settings.circularNailRadius = d,
                         ),
                       ),
                       Expanded(
@@ -44,6 +55,29 @@ class _ImagePageState extends State<ImagePage> {
                           initialValue: 512,
                           label: "Nail Count",
                           step: 1,
+                          onChange: (d) {
+                            _settings.nailCount = d;
+                            _minNailDistanceController.value = (d - 1) ~/ 2;
+                          },
+                        ),
+                      ),
+                      Expanded(
+                        child: SliderNumFieldForm.int(
+                          min: 0,
+                          max: 1024,
+                          initialValue: 512,
+                          label: "Min nail distance",
+                          step: 1,
+                          controller: _minNailDistanceController,
+                          onChange: (d) => _settings.minNailDistance,
+                        ),
+                      ),
+                      Expanded(
+                        child: SliderNumFieldForm.double(
+                          min: 0.0,
+                          max: 1.0,
+                          initialValue: 0.1,
+                          label: "Decay",
                         ),
                       ),
                     ],

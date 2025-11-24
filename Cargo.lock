@@ -791,6 +791,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
+name = "osi"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d18958727bf5316d271c96c59773c7277c1b28dfa5be746fe59ef75df995209c"
+
+[[package]]
 name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1162,7 +1168,9 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "string_art",
+ "sys",
  "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
@@ -1224,6 +1232,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "sys"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a1abe1badb950937867938994e23d187a0ae95923441bfb4c3142528f727174"
+dependencies = [
+ "osi",
 ]
 
 [[package]]

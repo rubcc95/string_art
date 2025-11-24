@@ -1,6 +1,5 @@
-use crate::nails;
 use crate::geometry;
-
+use crate::nails;
 
 #[derive(Clone, Copy)]
 pub struct Point;
@@ -12,7 +11,7 @@ impl nails::Builder for Point {
 
     type Link = Link;
 
-    type Handle = Self;
+    type Handle = Handle;
 
     type Error = Error;
 
@@ -22,7 +21,7 @@ impl nails::Builder for Point {
         position
     }
 
-    fn create_segment(
+    fn link_nails(
         &self,
         start: (&Self::Nail, Self::Link),
         end: (&Self::Nail, Self::Link),
@@ -30,8 +29,8 @@ impl nails::Builder for Point {
         Ok(geometry::Segment::new(*start.0, *end.0))
     }
 
-    fn anchor_builder(self) -> Self::Handle {
-        self
+    fn to_handle(&self) -> Self::Handle {
+        Handle
     }
 }
 
@@ -72,9 +71,9 @@ impl TryFrom<usize> for Link {
     type Error = FromIndexError;
 
     fn try_from(value: usize) -> Result<Self, Self::Error> {
-        match value{
+        match value {
             0 => Ok(Self),
-            val => Err(FromIndexError(val))
+            val => Err(FromIndexError(val)),
         }
     }
 }
@@ -83,10 +82,12 @@ impl TryFrom<usize> for Link {
 #[error("Index {0} is out of range")]
 pub struct FromIndexError(usize);
 
-impl nails::Handle for Point {
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Handle;
+
+impl nails::Handle for Handle {
     type Nail = geometry::Point<f32>;
     type Link = Link;
-    
 
     fn next_anchor(&self, anchor: nails::Anchor<Link>) -> nails::Anchor<Link> {
         anchor

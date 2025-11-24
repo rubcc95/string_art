@@ -7,6 +7,11 @@ export class Computation {
   rect(): any;
   next(): any | undefined;
 }
+export class DrawBackend {
+  free(): void;
+  [Symbol.dispose](): void;
+  constructor(draw_circle: any, draw_circunference: any, draw_segment: any);
+}
 export class WasmError {
   private constructor();
   free(): void;
@@ -25,6 +30,8 @@ export interface InitOutput {
   readonly __wbg_wasmerror_free: (a: number, b: number) => void;
   readonly __wbg_get_wasmerror_message: (a: number) => [number, number];
   readonly __wbg_set_wasmerror_message: (a: number, b: number, c: number) => void;
+  readonly __wbg_drawbackend_free: (a: number, b: number) => void;
+  readonly drawbackend_new: (a: any, b: any, c: any) => number;
   readonly __wbindgen_malloc: (a: number, b: number) => number;
   readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
   readonly __wbindgen_exn_store: (a: number) => void;

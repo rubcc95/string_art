@@ -6,41 +6,46 @@ use std::{f32::consts::PI, ops::Range};
 
 #[derive(Debug, Clone)]
 pub struct Ellipse<N: nails::Builder> {
+    pub nails: Vec<N::Nail>,
+    pub nail_builder: N,
+}
+
+impl<N: nails::Builder> Ellipse<N> {
+    pub fn new(rect: Rect<f32>, nail_builder: N, nail_count: usize) -> Self {
+        Self {
+            nails: (0..nail_count)
+                .map(|i| {
+                    let theta = 2.0 * PI * i as f32 / nail_count as f32;
+                    nail_builder.create_nail(
+                        geometry::Point {
+                            x: 0.5 * rect.width * (1.0 + theta.cos()),
+                            y: 0.5 * rect.height * (1.0 + theta.sin()),
+                        },
+                        theta,
+                    )
+                })
+                .collect(),
+            nail_builder,
+        }
+    }
+}
+pub struct Board<N: nails::Builder> {
     lines: Vec<Line>,
     pub handle: N::Handle,
     min_nail_distance: usize,
     nail_count: usize,
-    pub nails: Vec<N::Nail>,
 }
 
-impl<N: nails::Builder> Ellipse<N> {
-    pub fn new(
-        rect: Rect<f32>,
-        nail_builder: N,
-        nail_count: usize,
-        min_nail_distance: usize,
-    ) -> Result<Self, Error<N::Error>> {
-        let nails: Vec<_> = (0..nail_count)
-            .map(|i| {
-                let theta = 2.0 * PI * i as f32 / nail_count as f32;
-                nail_builder.create_nail(
-                    geometry::Point {
-                        x: 0.5 * rect.width * (1.0 + theta.cos()),
-                        y: 0.5 * rect.height * (1.0 + theta.sin()),
-                    },
-                    theta,
-                )
-            })
-            .collect();
-
-        let nails_view = nails.as_slice();
-        let builder = &nail_builder;
-
+impl<N: nails::Builder> Board<N> {
+    pub fn new(ellipse: &Ellipse<N>, min_nail_distance: usize) -> Result<Self, Error<N::Error>> {
+        let nails_view = ellipse.nails.as_slice();
+        let builder = &ellipse.nail_builder;
+        let nail_count = ellipse.nails.len();
         let this = Self {
             lines: Self::get_anchors(nail_count, min_nail_distance)
                 .map(|(big, small)| {
                     Ok(builder
-                        .create_segment(
+                        .link_nails(
                             (unsafe { nails_view.get_unchecked(small.idx) }, small.link),
                             (unsafe { nails_view.get_unchecked(big.idx) }, big.link),
                         )?
@@ -48,10 +53,9 @@ impl<N: nails::Builder> Ellipse<N> {
                 })
                 .collect::<Result<Vec<_>, N::Error>>()
                 .map_err(Error::Nail)?,
-            handle: nail_builder.anchor_builder(),
+            handle: builder.to_handle(),
             min_nail_distance,
             nail_count,
-            nails,
         };
         Ok(this)
     }
@@ -114,7 +118,7 @@ impl<N: nails::Builder> Ellipse<N> {
     }
 }
 
-impl<B: nails::Builder> Board for Ellipse<B> {
+impl<B: nails::Builder> crate::Board for Board<B> {
     type Batch = Range<usize>;
 
     type Anchor = nails::Anchor<B::Link>;
