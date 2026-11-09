@@ -1,46 +1,63 @@
+//! Uso mínimo del core: imagen sintética -> tablero -> cómputo.
+//!
+//! El backend se elige en el punto de construcción; el core no sabe cuál es.
+//! Con la feature `threads` se usa el pool de rayon; sin ella, `Serial`, y
+//! entonces el `Anchor` no tiene por qué ser `Send`/`Sync`.
+
 use geometry::Rect;
-use string_art::computation::Pipeline;
-use string_art::math::{Scalar32, ToFixed};
-use string_art::monocolor::MonocolorIndex;
-use string_art::nails::circular::Direction;
-use string_art::nails::{Builder, UniformCircular};
+use string_art::nails::{self, circular::Direction};
+use string_art::sync::Parallel;
 use string_art::*;
 
-fn main() {
-    let image = image::open("string_art/examples/assets/tiger.jpg")
-        .expect("Failed to open image")
-        .resize(1024, 1024, image::imageops::FilterType::Lanczos3);
+/// Imagen de prueba: degradado radial. No necesita assets.
+fn test_image(size: u32) -> image::RgbImage {
+    let center = size as f32 / 2.0;
+    image::RgbImage::from_fn(size, size, |x, y| {
+        let dx = x as f32 - center;
+        let dy = y as f32 - center;
+        let v = (dx.hypot(dy) / center * 255.0).min(255.0) as u8;
+        image::Rgb([v, v, v])
+    })
+}
 
-    let monocolor: Monocolor<nails::Anchor<nails::circular::Direction>, Scalar32> =
-        Monocolor::from_image(&image, 3);
+fn main() {
+    let image = test_image(256);
+
+    let monocolor: Monocolor<nails::Anchor<Direction>> = Monocolor::from_image(&image, 50);
 
     let board = Ellipse::new(
         Rect::new(image.height() as f32, image.width() as f32),
         nails::UniformCircular(0.1),
-        10,
-        1,
+        24,
+        2,
     )
-    .unwrap();
+    .expect("tablero inválido");
 
     let rect = Rect::new(image.height() as usize, image.width() as usize);
 
-    let mut computation =
-        Computation::new(monocolor, board, rect, decay::Flat(0.2.to_fixed())).unwrap();
-    while let Some(step) = computation.next(){
-        step.unwrap();
-        // if let Ok(step) = step{
-        //     println!("Step done from: {:?} to {:?}", step.anchor, computation.pipeline().color_map(&MonocolorIndex).anchor);
-        //     println!("      Segment: {}", step.segment);
-        // };
+    // Sin la feature `threads` solo existe `Serial`: es el mismo código, un
+    // backend u otro según lo que se haya compilado.
+    #[cfg(feature = "threads")]
+    let par = sync::RayonExec::auto();
+    #[cfg(not(feature = "threads"))]
+    let par = sync::Serial;
+
+    let mut computation = Computation::new(
+        par,
+        monocolor,
+        board,
+        rect,
+        decay::Decay::Flat(Frac::from_num(0.2)),
+    )
+    .expect("el mapa de color no cuadra con el área");
+
+    println!("hilos: {}", computation.par().workers());
+
+    for step in computation.by_ref().take(5) {
+        let step = step.expect("paso fallido");
+        println!(
+            "{:>3} -> {:<3} ({:.1}, {:.1})",
+            step.anchor.idx, step.anchor.link, step.segment.start.x, step.segment.start.y
+        );
     }
-
-    // let board = computation.board();
-    // let n23 = board.nails[23];
-    // let n4 = board.nails[4];
-    // let c = nails::UniformCircular(5.0);
-    // let res = c.create_segment((&n23, Direction::CLOCK_WISE), (&n4, Direction::CLOCK_WISE)).unwrap();
-    // let res2 = c.create_segment( (&n4, Direction::CLOCK_WISE), (&n23, Direction::CLOCK_WISE)).unwrap();
-
-    // println!("1 -> {res}");
-    // println!("2 -> {res2}");
 }

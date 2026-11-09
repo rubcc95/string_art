@@ -1,4 +1,5 @@
 /target
+/.harness
 *.jpg
 *.png
 *.svg

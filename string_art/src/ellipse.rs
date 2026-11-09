@@ -37,6 +37,14 @@ impl<N: nails::Builder> Ellipse<N> {
         nail_count: usize,
         min_nail_distance: usize,
     ) -> Result<Self, Error<N::Error>> {
+        // La cota no es opcional: `into_board` calcula `nail_count - 2 * min - 1`
+        // y `index_of` despeja `nail_count - (min + 1)`. Con `min` demasiado
+        // grande eso desborda (en release, envolviendo el índice de segmento).
+        let max_distance = nail_count.saturating_sub(1) / 2;
+        if min_nail_distance > max_distance {
+            return Err(Error::Distancer(max_distance));
+        }
+
         let nails: Vec<_> = (0..nail_count)
             .map(|i| {
                 let theta = 2.0 * PI * i as f32 / nail_count as f32;
@@ -58,8 +66,8 @@ impl<N: nails::Builder> Ellipse<N> {
                 .map(|(big, small)| {
                     Ok(builder
                         .create_segment(                            
-                            (unsafe { nails_view.get_unchecked(small.idx) }, small.link),
-                            (unsafe { nails_view.get_unchecked(big.idx) }, big.link),
+                            (&nails_view[small.idx], small.link),
+                            (&nails_view[big.idx], big.link),
                         )?
                         .into())
                 })
@@ -70,7 +78,33 @@ impl<N: nails::Builder> Ellipse<N> {
             nail_count,
             nails,
         };
+        #[cfg(debug_assertions)]
+        Self::debug_assert_links(&this.handle);
         Ok(this)
+    }
+
+    /// Verifica una sola vez, y solo en debug, el contrato de `Links`: que el
+    /// iterador produzca `LEN` enlaces y que `Handle::index_of` los numere de
+    /// `0` a `LEN - 1` sin repetir. Es el chequeo que sustituye a la antigua
+    /// promesa del `unsafe trait`.
+    #[cfg(debug_assertions)]
+    fn debug_assert_links(handle: &N::Handle) {
+        let links: Vec<_> = N::LINKS.into_iter().collect();
+        assert_eq!(
+            links.len(),
+            <N::Links as nails::Links>::LEN,
+            "El iterador de `Links` produce un número de enlaces distinto de `LEN`"
+        );
+        let mut seen = vec![false; links.len()];
+        for link in &links {
+            let idx = handle.index_of(link);
+            assert!(
+                idx < seen.len() && !seen[idx],
+                "`Handle::index_of` debe numerar los enlaces de 0 a LEN - 1 sin repetir; devolvió {idx} con LEN = {}",
+                seen.len()
+            );
+            seen[idx] = true;
+        }
     }
 
     fn get_anchors(
@@ -186,7 +220,9 @@ impl<B: nails::Builder> Board for EllipseBoard<B> {
                     ),
                 };                
                 SegmentRef::<B> {
-                    segment: unsafe { self.segments.get_unchecked(index) },
+                    // Si esto revienta, el culpable es `index_of` o el contrato de
+                    // `Links` (orden de iteración vs `index_of`), no quien llama.
+                    segment: &self.segments[index],
                     next_anchor: self.handle.next_anchor(nails::Anchor {
                         idx: to_idx,
                         link: to_link,
@@ -313,5 +349,13 @@ mod test {
     pub fn test() {
         test_ellipse(UniformCircular(0.5), 10, 1, 4);
         test_ellipse(Point, 123, 1, 10);
+    }
+
+    /// Antes estas cotas desbordaban `into_board` en lugar de devolver el error
+    /// que la API ya declaraba: `Distancer` era una variante muerta.
+    #[test]
+    fn rejects_min_distance_too_large() {
+        let result = Ellipse::new(Rect::new(10.0, 10.0), Point, 10, 5);
+        assert!(matches!(result, Err(Error::Distancer(4))));
     }
 }

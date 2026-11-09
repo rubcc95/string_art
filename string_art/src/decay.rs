@@ -1,27 +1,25 @@
-use num_traits::{CheckedSub, Zero};
-use std::ops::Mul;
+use crate::num::Frac;
 
-pub trait Fn<S>: Send + Sync {
-    fn compute(&self, weight: S) -> S;
+/// Cómo se reduce la energía de un píxel cuando pasa un hilo por encima.
+#[derive(Clone, Copy, Debug)]
+pub enum Decay {
+    /// Resta una cantidad fija. Se satura en cero.
+    Flat(Frac),
+    /// Conserva un porcentaje de la energía (entre 0 y 1).
+    Percentage(Frac),
 }
 
-#[derive(Clone, Copy)]
-pub struct Flat<S>(pub S);
-
-impl<S: Send + Sync + CheckedSub + Zero> Fn<S> for Flat<S> {
-    fn compute(&self, weight: S) -> S {
-        weight.checked_sub(&self.0).unwrap_or(S::zero())
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct Percentage<S>(pub S);
-
-impl<S: Send + Sync> Fn<S> for Percentage<S>
-where
-    for<'a> &'a S: Mul<S, Output = S>,
-{
-    fn compute(&self, weight: S) -> S {
-        self.0.mul(weight)
+impl Decay {
+    pub fn compute(&self, weight: Frac) -> Frac {
+        match *self {
+            Self::Flat(amount) => {
+                if weight > amount {
+                    weight - amount
+                } else {
+                    Frac::ZERO
+                }
+            }
+            Self::Percentage(ratio) => ratio * weight,
+        }
     }
 }
