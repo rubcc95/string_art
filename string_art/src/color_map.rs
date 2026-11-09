@@ -1,11 +1,7 @@
-pub struct ColorMap<A, C, S> {
+use crate::num::Frac;
+
+pub struct ColorMap<A, C> {
     pub anchor: A,
     pub color: C,
-    pub weights: Vec<S>,
+    pub weights: Vec<Frac>,
 }
-
-// impl<A: Default> ColorMap<A, C>{
-//     pub fn grayscale( color: C, image: Vec<Scalar>) -> Self{
-
-//     }
-// }

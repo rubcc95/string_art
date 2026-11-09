@@ -1,4 +1,9 @@
 
+//! Crate obsoleto: el core (`string_art`) ya no lo usa.
+//!
+//! Los tipos numéricos viven ahora en `string_art::num`. Se conserva solo
+//! como referencia y no forma parte del workspace.
+
 use num_traits::*;
 use fixed::types::*;
 use std::fmt::*;

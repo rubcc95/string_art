@@ -8,7 +8,7 @@ pub struct UniformCircular(pub f32);
 impl nails::Builder for UniformCircular {
     type Nail = Point<f32>;
 
-    type Links = Links;
+    type Links = [Direction; 2];
 
     type Handle = Self;
 
@@ -16,7 +16,7 @@ impl nails::Builder for UniformCircular {
 
     type Error = Error;
 
-    const LINKS: Self::Links = Links;
+    const LINKS: Self::Links = Direction::ALL;
 
     fn create_nail(&self, position: Point<f32>, _: f32) -> Self::Nail {
         position
@@ -44,25 +44,6 @@ impl nails::Builder for UniformCircular {
 
     fn anchor_builder(self) -> Self::Handle {
         self
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default)]
-pub struct Links;
-
-unsafe impl nails::Links for Links {
-    const LEN: usize = 2;
-
-    type Link = Direction;
-}
-
-impl IntoIterator for Links {
-    type Item = Direction;
-
-    type IntoIter = core::array::IntoIter<Direction, 2>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        Direction::ALL.into_iter()
     }
 }
 

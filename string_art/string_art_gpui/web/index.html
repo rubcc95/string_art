@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>String Art</title>
+<style>
+	html,
+	body {
+		margin: 0;
+		height: 100%;
+		overflow: hidden;
+		background: #1e1e1e;
+		color: #eeeeee;
+		font-family: system-ui, -apple-system, sans-serif;
+	}
+	#estado {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		align-items: center;
+		justify-content: center;
+		text-align: center;
+		padding: 24px;
+		font-size: 15px;
+		line-height: 1.5;
+	}
+	#estado small {
+		color: #9a9a9a;
+		font-size: 13px;
+	}
+</style>
+</head>
+<body>
+	<div id="estado">
+		<strong>cargando String Art…</strong>
+		<small id="detalle">compilando el módulo</small>
+	</div>
+
+	<script type="module">
+		const estado = document.getElementById("estado");
+		const detalle = document.getElementById("detalle");
+
+		// Sin aislamiento de origen no hay SharedArrayBuffer y gpui cae a un
+		// solo hilo. Se avisa en vez de dejar que parezca que va lento.
+		const aislado = globalThis.crossOriginIsolated === true;
+		const haySab = typeof SharedArrayBuffer !== "undefined";
+
+		detalle.textContent = aislado && haySab
+			? `memoria compartida sí · ${navigator.hardwareConcurrency} núcleos`
+			: `sin aislamiento de origen (COOP/COEP) · un solo hilo`;
+
+		try {
+			const { default: init } = await import("./string_art_gpui.js");
+			await init();
+			estado.remove();
+		} catch (error) {
+			estado.innerHTML =
+				`<strong>Error al arrancar</strong><small>${String(error)}</small>`;
+			console.error(error);
+		}
+	</script>
+</body>
+</html>

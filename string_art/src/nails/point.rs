@@ -8,7 +8,7 @@ pub struct Point;
 impl nails::Builder for Point {
     type Nail = geometry::Point<f32>;
 
-    type Links = Links;
+    type Links = [Link; 1];
 
     type Link = Link;
 
@@ -16,7 +16,7 @@ impl nails::Builder for Point {
 
     type Error = Error;
 
-    const LINKS: Self::Links = Links;
+    const LINKS: Self::Links = [Link];
 
     fn create_nail(&self, position: geometry::Point<f32>, _: f32) -> Self::Nail {
         position
@@ -32,24 +32,6 @@ impl nails::Builder for Point {
 
     fn anchor_builder(self) -> Self::Handle {
         self
-    }
-}
-
-pub struct Links;
-
-unsafe impl nails::Links for Links {
-    const LEN: usize = 1;
-
-    type Link = Link;
-}
-
-impl IntoIterator for Links {
-    type Item = Link;
-
-    type IntoIter = core::iter::Once<Link>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        core::iter::once(Link)
     }
 }
 
