@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 
-[dependencies] 
-string_art_geometry = { path = "../string_art_geometry" }
+[dependencies]
+string_art_geometry = { workspace = true }
 
 [features]
 default = []

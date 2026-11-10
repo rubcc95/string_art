@@ -1,9 +1,9 @@
 use std::iter::FusedIterator;
 
-use crate::{computation::*, num::*, sync::*, ColorMap, color};
+use crate::{Color, ColorMap, computation::*, num::*, sync::*};
 
 pub struct Monocolor<A> {
-    pub map: ColorMap<A, Color>,
+    pub map: ColorMap<A, Black>,
     pub threads: u32,
 }
 
@@ -18,7 +18,7 @@ impl<A: Default> Monocolor<A> {
         Self {
             map: ColorMap {
                 anchor: A::default(),
-                color: Color,
+                color: Black,
                 weights: image
                     .pixels()
                     .map(|(_, _, mut pixel)| {
@@ -34,29 +34,28 @@ impl<A: Default> Monocolor<A> {
 }
 
 #[derive(Debug, Clone, Copy, Default)]
-pub struct Color;
+pub struct Black;
 
-impl color::Color for Color {
+impl Color for Black {
     type Unit = u8;
 
+    #[inline]
     fn r(&self) -> u8 {
         0
     }
 
+    #[inline]
     fn g(&self) -> u8 {
         0
     }
 
+    #[inline]
     fn b(&self) -> u8 {
         0
     }
-
-    fn rgb(&self) -> [u8; 3] {
-        [0, 0, 0]
-    }
 }
 
-impl core::fmt::Display for Color {
+impl core::fmt::Display for Black {
     fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Ok(())
     }
@@ -104,23 +103,23 @@ impl<A> ExactSizeIterator for Monocolor<A> {
 impl<A: Clone + CondSend + CondSync> Pipeline for Monocolor<A> {
     type Anchor = A;
 
-    type Color = Color;
+    type Color = Black;
 
     type Index = MonocolorIndex;
 
-    fn color_map(&self, _: &Self::Index) -> &ColorMap<A, Color> {
+    fn color_map(&self, _: &Self::Index) -> &ColorMap<A, Black> {
         &self.map
     }
 
-    fn color_map_mut(&mut self, _: &Self::Index) -> &mut ColorMap<A, Color> {
+    fn color_map_mut(&mut self, _: &Self::Index) -> &mut ColorMap<A, Black> {
         &mut self.map
     }
 
-    fn color_maps(&self) -> &[ColorMap<A, Color>] {
+    fn color_maps(&self) -> &[ColorMap<A, Black>] {
         core::slice::from_ref(&self.map)
     }
 
-    fn color_maps_mut(&mut self) -> &mut [ColorMap<A, Color>] {
+    fn color_maps_mut(&mut self) -> &mut [ColorMap<A, Black>] {
         core::slice::from_mut(&mut self.map)
     }
 }

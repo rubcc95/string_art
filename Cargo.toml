@@ -6,12 +6,22 @@ members = [
     "string_art/string_art_grid",
     "string_art/string_art_color",
     "string_art/string_art_sync",
-    "string_art/string_art_gpui",
+    "string_art_gpui",
 ]
 
 [workspace.dependencies]
+# Crates internos. Las rutas son relativas a este manifiesto, así que los
+# miembros no dependen de dónde estén colocados dentro del workspace.
+string_art = { path = "string_art" }
+string_art_sync = { path = "string_art/string_art_sync", default-features = false }
+string_art_geometry = { path = "string_art/string_art_geometry", default-features = false }
+string_art_grid = { path = "string_art/string_art_grid" }
+string_art_color = { path = "string_art/string_art_color", default-features = false }
+
 num-traits = "^0.2"
 thiserror = "^2.0"
-image = "^0.25"
+# Sin defaults: los formatos que haga falta los activa quien decodifique. Con
+# los defaults, `image` arrastra el encoder AVIF (`ravif`/`rav1e`) a todos.
+image = { version = "^0.25", default-features = false }
 serde = { version = "^1.0", features = ["derive"] }
 derive_more = { version = "^2.0", features = ["deref", "deref_mut", "from"] }

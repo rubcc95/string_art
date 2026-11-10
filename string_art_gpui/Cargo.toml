@@ -1,0 +1,15 @@
+[package]
+name = "string_art_gpui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+string_art_sync = { workspace = true, features = ["threads"] }
+# Zed consume gpui con `default-features = false`: las features de plataforma
+# las activa `gpui_platform` según el target. Sus defaults aquí no aportan nada
+# y en wasm arrastran `windows-manifest`/`embed-resource` al build del host.
+gpui = { git = "https://github.com/zed-industries/zed", default-features = false }
+gpui_platform = { git = "https://github.com/zed-industries/zed" }
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+wasm-bindgen = "0.2"

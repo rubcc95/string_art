@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Lint del workspace de string_art en Android/Termux.
+# Lint del workspace de string_art.
 #
 #   ./lint.sh syntax   # Nivel 0: parseo de todos los .rs con rustfmt. Segundos, sin deps.
 #   ./lint.sh core     # Nivel 1: clippy sobre los crates sin hilos (geometría, rejilla, color).
@@ -10,33 +10,19 @@
 # Los niveles 2 y 3 se compilan en invocaciones separadas a propósito: dentro de
 # una sola, cargo unifica features y solo se compilaría una de las dos caras.
 #
-# Variables: JOBS=1 (jobs de cargo), FIX=1 (aplica cargo clippy --fix en el nivel core).
+# Variables: JOBS=<n> (jobs de cargo), FIX=1 (aplica cargo clippy --fix en el nivel core).
 set -uo pipefail
 cd "$(dirname "$0")" || exit 1
 
 CORE=(string_art_geometry string_art_grid string_art_color)
 
-# --- Arreglos del entorno Android -------------------------------------------
-# 1) rustc enlaza con -lunwind, que aquí solo existe como $PREFIX/lib/libunwind.a
-#    y el linker no lo busca por defecto.
-if [ -n "${PREFIX:-}" ] && [ -e "$PREFIX/lib/libunwind.a" ]; then
-	export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-L$PREFIX/lib"
-fi
-# 2) cargo-clippy no sabe ejecutar su propio clippy-driver en este entorno;
-#    usarlo como wrapper del compilador hace exactamente lo mismo.
-if [ -x "${PREFIX:-}/bin/clippy-driver" ]; then
-	export RUSTC_WORKSPACE_WRAPPER="$PREFIX/bin/clippy-driver"
-fi
-export CARGO_BUILD_JOBS="${JOBS:-1}"
 export CARGO_TERM_COLOR=never
-
-# Android no tiene /tmp; mktemp necesita un directorio escribible.
-: "${TMPDIR:=${HARNESS_SCRATCH:-$PWD/.harness/tmp}}"
-mkdir -p "$TMPDIR"
-export TMPDIR
+if [ -n "${JOBS:-}" ]; then
+	export CARGO_BUILD_JOBS="$JOBS"
+fi
 
 rust_sources() {
-	find . -name '*.rs' -not -path './.git/*' -not -path './.harness/*' -not -path './target/*'
+	find . -name '*.rs' -not -path './.git/*' -not -path './target/*'
 }
 
 # --- Nivel 0: solo parseo ------------------------------------------------
@@ -74,7 +60,7 @@ level_clippy() {
 	local fix=""
 	[ "${FIX:-0}" = "1" ] && fix="--fix --allow-dirty --allow-staged"
 
-	echo "clippy [$label] sobre: ${crates[*]}${feats:+ (features: $feats)} (JOBS=$CARGO_BUILD_JOBS)"
+	echo "clippy [$label] sobre: ${crates[*]}${feats:+ (features: $feats)}"
 	local args=() fargs=() c
 	for c in "${crates[@]}"; do args+=(-p "$c"); done
 	[ -n "$feats" ] && fargs+=(--features "$feats")
