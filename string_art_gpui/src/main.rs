@@ -1,6 +1,6 @@
 //! La aplicación: ventana de gpui que corre el cálculo sobre el pool de hilos.
 //!
-//! Nativo: `cargo run -p string_art_gpui --features gpui`.
+//! Nativo: `cargo run -p string_art_gpui`.
 //! Web: `cargo build --target wasm32-unknown-unknown ...` y cargar el `.wasm`.
 
 #![cfg_attr(target_family = "wasm", no_main)]

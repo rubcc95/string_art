@@ -24,7 +24,10 @@
   vacíos dejaban cruzar hilos con tipos que no lo son.
 
 ### Removed
-- `string_art_math` queda fuera del workspace: ya no lo usa nadie.
+- El andamiaje de compilación para Android/Termux: el wrapper de `clippy-driver`,
+  el `TMPDIR` de `.harness` y el resto de parches de `lint.sh`.
+- La feature `gpui` de `string_art_gpui`: gpui ya no es opcional.
+- `string_art_math`: ya no lo usa nadie.
 - La GUI de Dioxus entera: `string_art_gui`, `string_art_gui_common`,
   `string_art_gui_web_worker`, `string_art_gui_web_worker_registrar` y `xtask`.
 - Los perfiles de compilación `wasm-dev`, `server-dev` y `android-dev`.

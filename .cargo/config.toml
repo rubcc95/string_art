@@ -1,0 +1,22 @@
+# Build de la app web con hilos reales (SharedArrayBuffer).
+#
+# Sin `+atomics` el módulo no usa memoria compartida y `wasm_thread` no puede
+# arrancar workers. `+bulk-memory` y `+mutable-globals` completan lo que exige
+# instanciar el mismo módulo en varios workers compartiendo la memoria.
+#
+# Solo aplica al target wasm: el build nativo no se toca.
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "target-feature=+atomics,+bulk-memory,+mutable-globals"]
+
+# Recompila std y el runtime de pánico desde fuente. El std precompilado de
+# wasm32 no trae soporte de atomics, así que sin esto los workers no arrancan.
+# Requiere el componente rust-src del toolchain nightly.
+#
+# Cargo solo lo aplica cuando se pasa `--target`, así que los builds nativos
+# no se ven afectados.
+[unstable]
+build-std = ["std", "panic_abort"]
+
+# Atajo para el build web: `cargo +nightly web`.
+[alias]
+web = "build -p string_art_gpui --target wasm32-unknown-unknown"
