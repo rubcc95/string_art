@@ -24,6 +24,23 @@ impl GpuiExec {
     pub fn executor(&self) -> &BackgroundExecutor {
         &self.exec
     }
+
+    /// CPUs reales. `BackgroundExecutor::num_cpus` delega en `num_cpus::get()`,
+    /// que en wasm32 devuelve siempre 1 porque no puede leer el sistema. En web
+    /// el dato está en `navigator.hardwareConcurrency`, que expone
+    /// [`wasm_thread::available_parallelism`].
+    fn cpus(&self) -> usize {
+        #[cfg(target_family = "wasm")]
+        {
+            wasm_thread::available_parallelism()
+                .map(|cpus| cpus.get())
+                .unwrap_or(1)
+        }
+        #[cfg(not(target_family = "wasm"))]
+        {
+            self.exec.num_cpus()
+        }
+    }
 }
 
 /// Suelta la barrera aunque la tarea entre en pánico o se cancele.
@@ -42,7 +59,7 @@ impl Parallel for GpuiExec {
     /// Un hilo menos que el pool: el que llama se bloquea esperando y también
     /// hace falta sitio para el resto de trabajo de la interfaz.
     fn workers(&self) -> usize {
-        self.exec.num_cpus().saturating_sub(1).max(1)
+        self.cpus().saturating_sub(1).max(1)
     }
 
     fn for_each<T, F>(&self, bufs: &mut [T], f: F)

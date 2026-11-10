@@ -7,6 +7,8 @@
 
 mod exec;
 
+use std::borrow::Cow;
+
 use gpui::{
     App, Bounds, Context, Render, SharedString, Window, WindowBounds, WindowOptions, div,
     prelude::*, px, rgb, size,
@@ -39,6 +41,15 @@ impl Render for View {
 
 fn run() {
     application().run(|cx: &mut App| {
+        // La web no tiene fuentes del sistema. gpui_web mapea `.SystemUIFont`
+        // a "IBM Plex Sans", así que hay que registrar esa familia antes de
+        // abrir la ventana o el primer layout de texto panica.
+        cx.text_system()
+            .add_fonts(vec![Cow::Borrowed(include_bytes!(
+                "../assets/fonts/IBMPlexSans-Regular.ttf"
+            ))])
+            .expect("failed to load application fonts");
+
         let exec = GpuiExec::new(gpui_platform::background_executor());
         let workers = exec.workers();
 
@@ -58,7 +69,7 @@ fn run() {
             })
             .detach();
 
-        let status: SharedString = format!("hilos disponibles: {workers}").into();
+        let status: SharedString = format!("hilos de trabajo: {workers}").into();
         let bounds = Bounds::centered(None, size(px(480.), px(320.)), cx);
 
         cx.open_window(
