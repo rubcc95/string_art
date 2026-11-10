@@ -4262,6 +4262,7 @@ dependencies = [
  "gpui_platform",
  "string_art_sync",
  "wasm-bindgen",
+ "wasm_thread",
 ]
 
 [[package]]

@@ -13,3 +13,7 @@ gpui_platform = { git = "https://github.com/zed-industries/zed" }
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 wasm-bindgen = "0.2"
+# Misma rev que usa gpui_web para no duplicar el crate. `num_cpus::get()`
+# devuelve siempre 1 en wasm32; `wasm_thread::available_parallelism()` lee
+# `navigator.hardwareConcurrency`.
+wasm_thread = { git = "https://github.com/zed-industries/wasm_thread", rev = "0cf96c7708dfb97ccf3da50347e25edcf75d6937", features = ["es_modules"] }
