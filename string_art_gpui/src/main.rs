@@ -1,29 +1,78 @@
-//! La aplicación: ventana de gpui que corre el cálculo sobre el pool de hilos.
-//!
-//! Nativo: `cargo run -p string_art_gpui`.
-//! Web: `cargo build --target wasm32-unknown-unknown ...` y cargar el `.wasm`.
+//! La aplicación: ventana de gpui que mide el cálculo secuencial y en paralelo.
 
 #![cfg_attr(target_family = "wasm", no_main)]
 
+mod bench;
+#[cfg(target_family = "wasm")]
 mod exec;
 
 use std::borrow::Cow;
 
 use gpui::{
-    App, Bounds, Context, Render, SharedString, Window, WindowBounds, WindowOptions, div,
+    App, BackgroundExecutor, Bounds, Context, Render, Window, WindowBounds, WindowOptions, div,
     prelude::*, px, rgb, size,
 };
 use gpui_platform::application;
-use string_art_sync::Parallel;
+use web_time::Instant;
 
+#[cfg(target_family = "wasm")]
 use crate::exec::GpuiExec;
 
 struct View {
-    status: SharedString,
+    serial_ms: Option<f64>,
+    parallel_ms: Option<f64>,
+    running: bool,
+}
+
+impl View {
+    fn start(&mut self, parallel: bool, cx: &mut Context<Self>) {
+        if self.running {
+            return;
+        }
+        self.running = true;
+        cx.notify();
+
+        let exec = cx.background_executor().clone();
+        cx.spawn(async move |this, cx| {
+            let ms = exec
+                .clone()
+                .spawn(async move {
+                    let start = Instant::now();
+                    if parallel {
+                        run_parallel(exec);
+                    } else {
+                        bench::run(string_art::sync::Serial);
+                    }
+                    start.elapsed().as_secs_f64() * 1000.0
+                })
+                .await;
+
+            let _ = this.update(cx, |this, cx| {
+                if parallel {
+                    this.parallel_ms = Some(ms);
+                } else {
+                    this.serial_ms = Some(ms);
+                }
+                this.running = false;
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+}
+
+#[cfg(target_family = "wasm")]
+fn run_parallel(exec: BackgroundExecutor) {
+    bench::run(GpuiExec::new(exec));
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn run_parallel(_: BackgroundExecutor) {
+    bench::run(string_art::sync::RayonExec::auto());
 }
 
 impl Render for View {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         div()
             .flex()
             .flex_col()
@@ -35,41 +84,54 @@ impl Render for View {
             .text_xl()
             .text_color(rgb(0xffffff))
             .child("String Art")
-            .child(self.status.clone())
+            .child(
+                div()
+                    .flex()
+                    .gap_2()
+                    .child(
+                        div()
+                            .id("serial")
+                            .px_4()
+                            .py_2()
+                            .rounded_md()
+                            .bg(rgb(0x2563eb))
+                            .cursor_pointer()
+                            .child("Secuencial")
+                            .on_click(cx.listener(|this, _, _, cx| this.start(false, cx))),
+                    )
+                    .child(
+                        div()
+                            .id("parallel")
+                            .px_4()
+                            .py_2()
+                            .rounded_md()
+                            .bg(rgb(0x2563eb))
+                            .cursor_pointer()
+                            .child("Paralelo")
+                            .on_click(cx.listener(|this, _, _, cx| this.start(true, cx))),
+                    ),
+            )
+            .child(format!(
+                "Secuencial: {}",
+                self.serial_ms
+                    .map_or_else(|| "—".to_string(), |ms| format!("{ms:.1} ms"))
+            ))
+            .child(format!(
+                "Paralelo: {}",
+                self.parallel_ms
+                    .map_or_else(|| "—".to_string(), |ms| format!("{ms:.1} ms"))
+            ))
     }
 }
 
 fn run() {
     application().run(|cx: &mut App| {
-        // La web no tiene fuentes del sistema. gpui_web mapea `.SystemUIFont`
-        // a "IBM Plex Sans", así que hay que registrar esa familia antes de
-        // abrir la ventana o el primer layout de texto panica.
         cx.text_system()
             .add_fonts(vec![Cow::Borrowed(include_bytes!(
                 "../assets/fonts/IBMPlexSans-Regular.ttf"
             ))])
             .expect("failed to load application fonts");
 
-        let exec = GpuiExec::new(gpui_platform::background_executor());
-        let workers = exec.workers();
-
-        // El reparto va en una tarea de fondo: `for_each` bloquea al que llama y
-        // el hilo principal no puede esperar.
-        let background = exec.clone();
-        cx.background_executor()
-            .spawn(async move {
-                let mut slots = [0u64; 8];
-                background.for_each(&mut slots, |index, slot| {
-                    let mut acc = 0u64;
-                    for value in 0..200_000u64 {
-                        acc = acc.wrapping_add(value ^ index as u64);
-                    }
-                    *slot = acc;
-                });
-            })
-            .detach();
-
-        let status: SharedString = format!("hilos de trabajo: {workers}").into();
         let bounds = Bounds::centered(None, size(px(480.), px(320.)), cx);
 
         cx.open_window(
@@ -77,7 +139,13 @@ fn run() {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 ..Default::default()
             },
-            |_, cx| cx.new(|_| View { status }),
+            |_, cx| {
+                cx.new(|_| View {
+                    serial_ms: None,
+                    parallel_ms: None,
+                    running: false,
+                })
+            },
         )
         .unwrap();
 
