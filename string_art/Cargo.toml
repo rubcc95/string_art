@@ -25,4 +25,4 @@ image = ["dep:image", "string_art_color/image"]
 serde = ["dep:serde", "string_art_geometry/serde", "fixed/serde"]
 # Hilos de verdad. Sin esto el cálculo es monohilo y `Anchor` no tiene por qué
 # ser `Send`/`Sync`. Lo enciende quien use un backend paralelo (rayon, gpui).
-threads = ["string_art_sync/threads"]
+multithreaded = ["string_art_sync/multithreaded"]

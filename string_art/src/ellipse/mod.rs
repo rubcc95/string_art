@@ -1,33 +1,21 @@
+mod internal;
+
 use crate::*;
 use board::*;
-use derive_more::*;
 use geometry::Rect;
 use nails::*;
-use std::{
-    f32::consts::PI,
-    fmt::{Debug, Display},
-};
+use std::f32::consts::PI;
 
 #[derive(Debug, Clone)]
 pub struct Ellipse<N: nails::Builder> {
     segments: Vec<Segment>,
-    pub handle: N::Handle,
+    handle: N::Handle,
     min_nail_distance: usize,
     nail_count: usize,
-    pub nails: Vec<N::Nail>,
-}
-
-impl<N: nails::Builder> IntoBoard for Ellipse<N> {
-    type Board = EllipseBoard<N>;
-
-    fn into_board(self, cpus: usize) -> Self::Board {
-        let total_combs = self.nail_count - 2 * self.min_nail_distance - 1;
-        EllipseBoard {
-            ellipse: self,
-            total_combs,
-            per_batch: (total_combs + cpus - 1) / cpus,
-        }
-    }
+    // No se lee después de construir, pero se conserva como parte del estado
+    // del tablero. Si un consumidor lo necesita, se añadirá un accesor.
+    #[allow(dead_code)]
+    nails: Vec<N::Nail>,
 }
 
 impl<N: nails::Builder> Ellipse<N> {
@@ -65,7 +53,7 @@ impl<N: nails::Builder> Ellipse<N> {
             segments: Self::get_anchors(nail_count, min_nail_distance)
                 .map(|(big, small)| {
                     Ok(builder
-                        .create_segment(                            
+                        .create_segment(
                             (&nails_view[small.idx], small.link),
                             (&nails_view[big.idx], big.link),
                         )?
@@ -165,76 +153,7 @@ impl<N: nails::Builder> Ellipse<N> {
     }
 }
 
-#[derive(Deref, DerefMut)]
-pub struct EllipseBoard<B: nails::Builder> {
-    #[deref]
-    #[deref_mut]
-    ellipse: Ellipse<B>,
-    total_combs: usize,
-    per_batch: usize,
-}
-
-impl<B: nails::Builder> Display for EllipseBoard<B> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Ellipse, nail count: {}", self.ellipse.nail_count)
-    }
-}
-
-impl<B: nails::Builder> Board for EllipseBoard<B> {
-    type Anchor = nails::Anchor<B::Link>;
-
-    fn get_segment(&self, idx: usize) -> Option<&Segment> {
-        self.segments.get(idx)
-    }
-
-    fn get_segment_mut(&mut self, idx: usize) -> Option<&mut Segment> {
-        self.ellipse.segments.get_mut(idx)
-    }
-
-    fn batch<'a>(
-        &'a self,
-        from: &'a Self::Anchor,
-        index: usize,
-    ) -> impl Iterator<Item: board::SegmentRef<Anchor = Self::Anchor>> + 'a {
-        let start = index * self.per_batch;
-        let range = start..self.total_combs.min(start + self.per_batch);
-        range.flat_map(move |index| {
-            let mut to_idx = 1 + from.idx + self.min_nail_distance + index;
-            if let Some(new_idx) = to_idx.checked_sub(self.nail_count) {
-                to_idx = new_idx;
-            }
-
-            B::LINKS.into_iter().map(move |to_link| {
-                let to = nails::Anchor {
-                    idx: to_idx,
-                    link: to_link.clone(),
-                };
-                let index = match self.index_of(from.clone(), to.clone()) {
-                    Some(data) => data,
-                    None => panic!(
-                        "Failed {}, {:?}, {}, {:?}",
-                        from.idx,
-                        self.handle.index_of(&from.link),
-                        to.idx,
-                        self.handle.index_of(&to.link)
-                    ),
-                };                
-                SegmentRef::<B> {
-                    // Si esto revienta, el culpable es `index_of` o el contrato de
-                    // `Links` (orden de iteración vs `index_of`), no quien llama.
-                    segment: &self.segments[index],
-                    next_anchor: self.handle.next_anchor(nails::Anchor {
-                        idx: to_idx,
-                        link: to_link,
-                    }),
-                    index,
-                }
-            })
-        })
-    }
-}
-
-pub struct SegmentRef<'a, N: nails::Builder> {
+struct SegmentRef<'a, N: nails::Builder> {
     segment: &'a Segment,
     next_anchor: nails::Anchor<N::Link>,
     index: usize,
@@ -257,7 +176,6 @@ impl<'a, N: nails::Builder> board::SegmentRef for SegmentRef<'a, N> {
 }
 
 #[derive(Debug, thiserror::Error)]
-
 pub enum Error<N> {
     #[error(transparent)]
     Nail(N),
@@ -268,8 +186,26 @@ pub enum Error<N> {
 #[cfg(test)]
 mod test {
     use crate::board::SegmentRef;
+    use crate::nails::Handle;
 
     use super::*;
+    use internal::EllipseBoard;
+
+    /// Helper de debug solo para estos tests. Antes vivía en
+    /// `nails::anchor::Debugger`, pero no forma parte de la API pública.
+    struct Debugger<'a, H, L> {
+        handle: &'a H,
+        anchor: &'a Anchor<L>,
+    }
+
+    impl<H: Handle> core::fmt::Debug for Debugger<'_, H, H::Link> {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("Anchor")
+                .field("idx", &self.anchor.idx)
+                .field("link", &self.handle.index_of(&self.anchor.link))
+                .finish()
+        }
+    }
 
     pub fn test_ellipse<N: nails::Builder>(
         nails: N,
@@ -282,7 +218,7 @@ mod test {
         let board = ellipse.into_board(batches);
         let mut i = 0;
         for (a, b) in Ellipse::<N>::get_anchors(nail_count, nail_distance) {
-            match board.ellipse.index_of(a.clone(), b.clone()) {
+            match board.index_of(a.clone(), b.clone()) {
                 Some(index) => {
                     assert_eq!(
                         i,
@@ -290,11 +226,11 @@ mod test {
                         "Expected index {}, but got {} for anchors: {:?} and {:?}",
                         i,
                         index,
-                        anchor::Debugger {
+                        Debugger {
                             handle: &board.handle,
                             anchor: &a
                         },
-                        anchor::Debugger {
+                        Debugger {
                             handle: &board.handle,
                             anchor: &b
                         }
@@ -303,18 +239,18 @@ mod test {
                 }
                 None => panic!(
                     "Failed to get index for anchors: {:?} and {:?}",
-                    anchor::Debugger {
+                    Debugger {
                         handle: &board.handle,
                         anchor: &a
                     },
-                    anchor::Debugger {
+                    Debugger {
                         handle: &board.handle,
                         anchor: &b
                     }
                 ),
             }
         }
-        let mut counter = vec![0; board.ellipse.segments.len()];
+        let mut counter = vec![0; board.segments.len()];
 
         for anchor_idx in 0..nail_count {
             for link in N::LINKS.into_iter() {
@@ -347,7 +283,7 @@ mod test {
 
     #[test]
     pub fn test() {
-        test_ellipse(UniformCircular(0.5), 10, 1, 4);
+        test_ellipse(Circular(0.5), 10, 1, 4);
         test_ellipse(Point, 123, 1, 10);
     }
 

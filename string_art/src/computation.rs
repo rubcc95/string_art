@@ -1,13 +1,21 @@
 use std::iter::FusedIterator;
 
-use crate::num::{Scalar, scalar_from_frac};
+use crate::num::{Frac, Scalar, scalar_from_frac};
 use crate::*;
 use board::*;
 use geometry::Rect;
-use sync::*;
+
+pub struct ColorMap<A, C> {
+    pub anchor: A,
+    pub color: C,
+    pub weights: Vec<Frac>,
+}
 
 pub trait Pipeline: Iterator<Item = Self::Index> {
-    type Anchor: CondSend + CondSync + Clone;
+    #[cfg(feature = "multithreaded")]
+    type Anchor: Send + Sync + Clone;
+    #[cfg(not(feature = "multithreaded"))]
+    type Anchor = Clone;
     type Color: Clone;
     type Index: Clone + Into<usize>;
 
@@ -20,7 +28,7 @@ pub trait Pipeline: Iterator<Item = Self::Index> {
     fn color_maps_mut(&mut self) -> &mut [ColorMap<Self::Anchor, Self::Color>];
 }
 
-pub struct Computation<B, P: Pipeline, X: Parallel> {
+pub struct Computation<B, P: Pipeline, X: Executor> {
     pipeline: P,
     inner: Inner<B, P, X>,
 }
@@ -29,7 +37,7 @@ pub struct Computation<B, P: Pipeline, X: Parallel> {
 #[error("The length of the color map buffer does not match the length of the rectangle area.")]
 pub struct RectAreaError;
 
-impl<'a, B, P: Pipeline, X: Parallel> Computation<B, P, X> {
+impl<'a, B, P: Pipeline, X: Executor> Computation<B, P, X> {
     pub fn board(&self) -> &B {
         &self.inner.board
     }
@@ -52,7 +60,7 @@ impl<'a, B, P, X> Computation<B, P, X>
 where
     B: Board,
     P: Pipeline<Anchor = B::Anchor>,
-    X: Parallel,
+    X: Executor,
 {
     pub fn new<T: IntoBoard<Board = B>>(
         par: X,
@@ -89,9 +97,9 @@ impl<'a, B, P, X> Iterator for Computation<B, P, X>
 where
     B: Board,
     P: Pipeline<Anchor = B::Anchor>,
-    X: Parallel,
+    X: Executor,
 {
-    type Item = Result<Step<P>, Error>;
+    type Item = Result<Step<P>, StepError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.pipeline.next().and_then(|index| {
@@ -99,7 +107,7 @@ where
             self.inner.get_best_line(map).map(|line| {
                 let segment = match B::get_segment_mut(&mut self.inner.board, line.segment_idx) {
                     Some(segment) => segment,
-                    None => return Err(Error),
+                    None => return Err(StepError),
                 };
                 segment.set_used();
                 let anchor = core::mem::replace(&mut map.anchor, line.anchor);
@@ -130,7 +138,7 @@ impl<'a, B, P, X> ExactSizeIterator for Computation<B, P, X>
 where
     B: Board,
     P: Pipeline<Anchor = B::Anchor> + ExactSizeIterator,
-    X: Parallel,
+    X: Executor,
 {
     fn len(&self) -> usize {
         self.pipeline.len()
@@ -141,15 +149,15 @@ impl<'a, B, P, X> FusedIterator for Computation<B, P, X>
 where
     B: Board,
     P: Pipeline<Anchor = B::Anchor> + FusedIterator,
-    X: Parallel,
+    X: Executor,
 {
 }
 
 #[derive(Debug, thiserror::Error)]
 #[error("Computation error")]
-pub struct Error;
+pub struct StepError;
 
-struct Inner<B, P: Pipeline, X: Parallel> {
+struct Inner<B, P: Pipeline, X: Executor> {
     par: X,
     board: B,
     decay: decay::Decay,
@@ -161,7 +169,7 @@ impl<'a, B, P, X> Inner<B, P, X>
 where
     B: Board,
     P: Pipeline<Anchor = B::Anchor>,
-    X: Parallel,
+    X: Executor,
 {
     fn get_best_line(
         &mut self,

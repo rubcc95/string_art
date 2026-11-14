@@ -15,11 +15,11 @@ pub type Scalar = U32F32;
 
 /// Subpíxel de 8 bits a `Frac`, replicando el byte por todos los bits
 /// fraccionarios (0 a 0, 128 a ~0,502, 255 a ~1,0).
-pub fn frac_from_u8(value: u8) -> Frac {
+pub(crate) fn frac_from_u8(value: u8) -> Frac {
     Frac::from_bits(u32::from(value) * 0x0101_0101)
 }
 
 /// `Frac` a `Scalar`, para poder acumular sin salir del rango.
-pub fn scalar_from_frac(frac: Frac) -> Scalar {
+pub(crate) fn scalar_from_frac(frac: Frac) -> Scalar {
     Scalar::from_bits(u64::from(frac.to_bits()))
 }

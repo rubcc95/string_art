@@ -13,8 +13,4 @@ default = []
 # que un `Anchor` con `Rc` dentro es perfectamente válido. Con esto encendido
 # vuelven a ser `Send`/`Sync` reales, que es lo que exige el backend al repartir
 # trabajo.
-threads = ["dep:rayon", "dep:num_cpus"]
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-rayon = { version = "^1.10", optional = true }
-num_cpus = { version = "^1.16", optional = true }
+multithreaded = []

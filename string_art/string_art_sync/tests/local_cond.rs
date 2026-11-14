@@ -5,11 +5,11 @@
 //! Con `threads` encendida este fichero queda vacío: ese mismo código deja de
 //! compilar, que es exactamente lo que debe pasar.
 
-#![cfg(not(feature = "threads"))]
+#![cfg(not(feature = "multithreaded"))]
 
 use std::rc::Rc;
 
-use string_art_sync::{CondSend, CondSync, Parallel, Serial};
+use string_art_sync::{CondSend, CondSync, Executor, Serial};
 
 fn assert_cond<T: CondSend + CondSync>() {}
 
@@ -28,7 +28,10 @@ fn serial_acepta_un_buffer_que_no_es_send() {
         *slot = Some(Rc::new(index as u8));
     });
 
-    assert_eq!(bufs.iter().map(|b| *b.clone().unwrap()).collect::<Vec<_>>(), vec![0, 1]);
+    assert_eq!(
+        bufs.iter().map(|b| *b.clone().unwrap()).collect::<Vec<_>>(),
+        vec![0, 1]
+    );
 }
 
 #[test]

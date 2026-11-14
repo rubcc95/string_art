@@ -3,19 +3,19 @@
 #![cfg_attr(target_family = "wasm", no_main)]
 
 mod bench;
-#[cfg(target_family = "wasm")]
+#[cfg(feature = "multithreaded")]
 mod exec;
 
 use std::borrow::Cow;
 
 use gpui::{
-    App, BackgroundExecutor, Bounds, Context, Render, Window, WindowBounds, WindowOptions, div,
-    prelude::*, px, rgb, size,
+    App, Bounds, Context, Render, Window, WindowBounds, WindowOptions, div, prelude::*, px, rgb,
+    size,
 };
 use gpui_platform::application;
 use web_time::Instant;
 
-#[cfg(target_family = "wasm")]
+#[cfg(feature = "multithreaded")]
 use crate::exec::GpuiExec;
 
 struct View {
@@ -38,11 +38,18 @@ impl View {
                 .clone()
                 .spawn(async move {
                     let start = Instant::now();
-                    if parallel {
-                        run_parallel(exec);
-                    } else {
-                        bench::run(string_art::sync::Serial);
+
+                    #[cfg(feature = "multithreaded")]
+                    {
+                        if parallel {
+                            bench::run(GpuiExec::new(exec));
+                        } else {
+                            bench::run(string_art_serial::SerialExec);
+                        }
                     }
+                    #[cfg(not(feature = "multithreaded"))]
+                    bench::run(string_art_serial::Serial);
+
                     start.elapsed().as_secs_f64() * 1000.0
                 })
                 .await;
@@ -59,16 +66,6 @@ impl View {
         })
         .detach();
     }
-}
-
-#[cfg(target_family = "wasm")]
-fn run_parallel(exec: BackgroundExecutor) {
-    bench::run(GpuiExec::new(exec));
-}
-
-#[cfg(not(target_family = "wasm"))]
-fn run_parallel(_: BackgroundExecutor) {
-    bench::run(string_art::sync::RayonExec::auto());
 }
 
 impl Render for View {

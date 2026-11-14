@@ -1,6 +1,5 @@
-use crate::nails;
 use crate::geometry;
-
+use crate::nails;
 
 #[derive(Clone, Copy)]
 pub struct Point;
@@ -14,7 +13,7 @@ impl nails::Builder for Point {
 
     type Handle = Self;
 
-    type Error = Error;
+    type Error = core::convert::Infallible;
 
     const LINKS: Self::Links = [Link];
 
@@ -50,25 +49,9 @@ impl Into<usize> for Link {
     }
 }
 
-impl TryFrom<usize> for Link {
-    type Error = FromIndexError;
-
-    fn try_from(value: usize) -> Result<Self, Self::Error> {
-        match value{
-            0 => Ok(Self),
-            val => Err(FromIndexError(val))
-        }
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
-#[error("Index {0} is out of range")]
-pub struct FromIndexError(usize);
-
 impl nails::Handle for Point {
     type Nail = geometry::Point<f32>;
     type Link = Link;
-    
 
     fn next_anchor(&self, anchor: nails::Anchor<Link>) -> nails::Anchor<Link> {
         anchor
@@ -81,12 +64,4 @@ impl nails::Handle for Point {
     fn reversed(&self, anchor: nails::Anchor<Self::Link>) -> nails::Anchor<Self::Link> {
         anchor
     }
-    // #[cfg(feature = "svg")]
-    // fn draw(&self, _: &Self::Nail, d: &mut svg::Document) {
-    //     let a = d.get_children();
-    // }
 }
-
-#[derive(Debug, thiserror::Error)]
-#[error("Point error")]
-pub struct Error;

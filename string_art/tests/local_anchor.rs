@@ -5,17 +5,18 @@
 //! Con `threads` encendida este fichero queda vacío a propósito: ese mismo
 //! código dejaría de compilar, porque entonces `CondSend` es `Send` de verdad.
 
-#![cfg(not(feature = "threads"))]
+#![cfg(not(feature = "multithreaded"))]
 
 use std::rc::Rc;
 
+use string_art::Frac;
 use string_art::computation::Pipeline;
-use string_art::monocolor::{Color, Monocolor};
+use string_art::Monocolor;
 use string_art::sync::{CondSend, CondSync};
-use string_art::{ColorMap, Frac};
 
 /// Ancla que no puede cruzar hilos: lleva un `Rc`.
 #[derive(Clone, Default)]
+#[allow(dead_code)]
 struct LocalAnchor(Rc<()>);
 
 fn assert_cond<T: CondSend + CondSync>() {}
@@ -32,14 +33,6 @@ fn cualquier_tipo_es_cond_send_sin_hilos() {
 fn el_pipeline_admite_un_ancla_que_no_es_send() {
     assert_pipeline::<Monocolor<LocalAnchor>>();
 
-    let monocolor = Monocolor::<LocalAnchor> {
-        map: ColorMap {
-            anchor: LocalAnchor::default(),
-            color: Color,
-            weights: vec![Frac::ZERO; 4],
-        },
-        threads: 1,
-    };
-
-    assert_eq!(monocolor.map.weights.len(), 4);
+    let monocolor = Monocolor::<LocalAnchor>::new(LocalAnchor::default(), vec![Frac::ZERO; 4], 1);
+    assert_eq!(monocolor.weights().len(), 4);
 }

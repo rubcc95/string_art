@@ -3,9 +3,9 @@ use crate::nails;
 use derive_more::*;
 
 #[derive(Clone, Copy, Debug, Deref, DerefMut, From)]
-pub struct UniformCircular(pub f32);
+pub struct Circular(pub f32);
 
-impl nails::Builder for UniformCircular {
+impl nails::Builder for Circular {
     type Nail = Point<f32>;
 
     type Links = [Direction; 2];
@@ -78,7 +78,7 @@ impl Direction {
         Self(circle::Direction::CounterClockWise),
     ];
 
-    pub fn reversed(self) -> Self{
+    pub fn reversed(self) -> Self {
         match self.0 {
             circle::Direction::ClockWise => Self::COUNTER_CLOCK_WISE,
             circle::Direction::CounterClockWise => Self::CLOCK_WISE,
@@ -92,22 +92,7 @@ impl From<Direction> for usize {
     }
 }
 
-impl TryFrom<usize> for Direction {
-    type Error = FromIndexError;
-
-    fn try_from(value: usize) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(Self(circle::Direction::ClockWise)),
-            1 => Ok(Self(circle::Direction::CounterClockWise)),
-            val => Err(FromIndexError(val)),
-        }
-    }
-}
-#[derive(Debug, thiserror::Error)]
-#[error("Index {0} is out of range")]
-pub struct FromIndexError(usize);
-
-impl nails::Handle for UniformCircular {
+impl nails::Handle for Circular {
     type Nail = Point<f32>;
     type Link = Direction;
 
@@ -121,16 +106,20 @@ impl nails::Handle for UniformCircular {
             circle::Direction::CounterClockWise => 1,
         }
     }
-    
+
     fn reversed(&self, mut anchor: nails::Anchor<Self::Link>) -> nails::Anchor<Self::Link> {
         anchor.link = anchor.link.reversed();
         anchor
     }
 }
 
-#[derive(Debug, thiserror::Error)]
-#[error("The nails are overlapping")]
-pub struct Error;
+mod error {
+    #[derive(Debug, thiserror::Error)]
+    #[error("The nails are overlapping")]
+    pub struct Error;
+}
+
+use error::Error;
 
 #[cfg(test)]
 mod tests {
@@ -140,7 +129,7 @@ mod tests {
     #[test]
     fn test_circular_tangents_are_correct() {
         let radius = 1.0;
-        let circular = UniformCircular(radius);
+        let circular = Circular(radius);
 
         let p1 = Point::new(0.0, 0.0);
         let p2 = Point::new(4.0, 0.0);
