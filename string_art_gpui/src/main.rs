@@ -48,7 +48,7 @@ impl View {
                         }
                     }
                     #[cfg(not(feature = "multithreaded"))]
-                    bench::run(string_art_serial::Serial);
+                    bench::run(string_art_serial::SerialExec);
 
                     start.elapsed().as_secs_f64() * 1000.0
                 })

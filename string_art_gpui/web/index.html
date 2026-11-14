@@ -3,6 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#1e1e1e">
+<!-- Uncompressed release wasm size. Used to calculate progress when the
+     server serves it compressed (brotli/gzip), because Content-Length is then
+     the compressed size and is not usable. If the wasm is served uncompressed,
+     the script uses Content-Length and ignores this value. Update after each
+     release build. -->
+<meta name="wasm-bytes" content="14418511">
 <title>String Art</title>
 <style>
 	html,
@@ -12,55 +20,340 @@
 		overflow: hidden;
 		background: #1e1e1e;
 		color: #eeeeee;
-		font-family: system-ui, -apple-system, sans-serif;
+		font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 	}
-	#status {
+
+	[hidden] {
+		display: none !important;
+	}
+
+	#loading {
 		position: absolute;
 		inset: 0;
+		z-index: 10;
 		display: flex;
 		flex-direction: column;
-		gap: 8px;
+		gap: 10px;
 		align-items: center;
 		justify-content: center;
-		text-align: center;
 		padding: 24px;
-		font-size: 15px;
-		line-height: 1.5;
+		text-align: center;
+		background: #1e1e1e;
+		opacity: 0;
+		animation: appear 180ms ease-out 120ms forwards;
 	}
-	#status small {
-		color: #9a9a9a;
+
+	#loading.is-hidden {
+		animation: none;
+		opacity: 0;
+		transition: opacity 180ms ease-out;
+		pointer-events: none;
+	}
+
+	.motif {
+		width: 88px;
+		height: 88px;
+		overflow: visible;
+	}
+
+	.nails {
+		fill: none;
+		stroke: #3a3a3a;
+		stroke-width: 3;
+		stroke-dasharray: 0.1 12.5;
+		stroke-linecap: round;
+	}
+
+	.thread {
+		fill: none;
+		stroke: #60a5fa;
+		stroke-width: 1.25;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		opacity: 0.85;
+		transform-box: view-box;
+		transform-origin: 48px 48px;
+		will-change: transform;
+		animation: spin 3.2s linear infinite;
+	}
+
+	h1 {
+		margin: 0;
+		font-size: 18px;
+		font-weight: 500;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: #eeeeee;
+	}
+
+	#status {
+		margin: 0;
+		min-height: 1.5em;
+		font-size: 14px;
+		line-height: 1.5;
+		color: #b4b4b4;
+	}
+
+	#percent {
+		margin: 0;
+		min-height: 1.2em;
+		font-size: 12px;
+		line-height: 1.2;
+		color: #8a8a8a;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.progress {
+		width: min(240px, 62vw);
+		height: 2px;
+		overflow: hidden;
+		border-radius: 999px;
+		background: #333333;
+	}
+
+	.progress span {
+		display: block;
+		width: 100%;
+		height: 100%;
+		border-radius: inherit;
+		background: linear-gradient(90deg, #2563eb, #60a5fa);
+		transform: scaleX(0);
+		transform-origin: left center;
+		transition: transform 160ms linear;
+	}
+
+	.progress.indeterminate span {
+		width: 38%;
+		transform: none;
+		animation: slide 1.15s ease-in-out infinite;
+	}
+
+	.note {
+		margin: 0;
+		max-width: 340px;
+		font-size: 12px;
+		line-height: 1.5;
+		color: #777777;
+	}
+
+	.error {
+		margin: 0;
+		max-width: 420px;
+		font-size: 12px;
+		line-height: 1.5;
+		color: #f87171;
+		overflow-wrap: anywhere;
+	}
+
+	#retry {
+		margin-top: 2px;
+		padding: 8px 14px;
+		border: 0;
+		border-radius: 6px;
+		background: #2563eb;
+		color: #ffffff;
+		font: inherit;
 		font-size: 13px;
+		cursor: pointer;
+	}
+
+	#retry:hover {
+		background: #1d4ed8;
+	}
+
+	@keyframes appear {
+		to {
+			opacity: 1;
+		}
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	@keyframes slide {
+		from {
+			transform: translateX(-100%);
+		}
+		to {
+			transform: translateX(270%);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		#loading {
+			animation: none;
+			opacity: 1;
+		}
+
+		.thread,
+		.progress.indeterminate span {
+			animation: none;
+		}
+
+		#loading.is-hidden {
+			transition: none;
+		}
 	}
 </style>
 </head>
 <body>
-	<div id="status">
-		<strong>loading String Art…</strong>
-		<small id="detail">compiling the module</small>
+	<div id="loading">
+		<svg class="motif" viewBox="0 0 96 96" aria-hidden="true">
+			<circle class="nails" cx="48" cy="48" r="33"></circle>
+			<g class="thread">
+				<path d="M48 15 L73 63 L23 63 Z"></path>
+				<path d="M48 15 L48 81"></path>
+			</g>
+		</svg>
+		<h1>String Art</h1>
+		<p id="status" role="status">Downloading…</p>
+		<div id="progress" class="progress" role="progressbar" aria-label="Application download" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+			<span></span>
+		</div>
+		<p id="percent" aria-hidden="true">0 %</p>
+		<p id="note" class="note" hidden></p>
+		<p id="error" class="error" hidden></p>
+		<button id="retry" type="button" hidden>Retry</button>
+		<noscript>
+			<p class="note">This application requires JavaScript to start.</p>
+		</noscript>
 	</div>
 
-	<script type="module">
+	<script>
+	"use strict";
+
+	(() => {
+		const loading = document.getElementById("loading");
 		const status = document.getElementById("status");
-		const detail = document.getElementById("detail");
+		const progress = document.getElementById("progress");
+		const fill = progress.firstElementChild;
+		const percent = document.getElementById("percent");
+		const note = document.getElementById("note");
+		const errorText = document.getElementById("error");
+		const retry = document.getElementById("retry");
 
-		// Without origin isolation there is no SharedArrayBuffer and gpui falls
-		// back to a single thread. We warn instead of letting it look slow.
-		const isolated = globalThis.crossOriginIsolated === true;
-		const hasSharedArrayBuffer = typeof SharedArrayBuffer !== "undefined";
+		const metaTotal = Number(document.querySelector('meta[name="wasm-bytes"]')?.content) || 0;
+		const wasmUrl = new URL("string_art_gpui_bg.wasm", document.baseURI);
 
-		detail.textContent = isolated && hasSharedArrayBuffer
-			? `shared memory available · ${navigator.hardwareConcurrency} cores`
-			: `no origin isolation (COOP/COEP) · single thread`;
-
-		try {
-			const { default: init } = await import("./string_art_gpui.js");
-			await init();
-			status.remove();
-		} catch (error) {
-			status.innerHTML =
-				`<strong>Failed to start</strong><small>${String(error)}</small>`;
-			console.error(error);
+		// Without cross-origin isolation there is no SharedArrayBuffer and gpui
+		// falls back to a single thread. Warn instead of letting it look slow.
+		if (!(globalThis.crossOriginIsolated === true && typeof SharedArrayBuffer !== "undefined")) {
+			note.textContent = "No cross-origin isolation (COOP/COEP): single thread.";
+			note.hidden = false;
 		}
+
+		const paintProgress = (() => {
+			let pending = false;
+			let fraction = 0;
+
+			return (value) => {
+				fraction = Math.max(0, Math.min(1, value));
+				if (pending) {
+					return;
+				}
+				pending = true;
+				requestAnimationFrame(() => {
+					pending = false;
+					fill.style.transform = `scaleX(${fraction})`;
+					progress.setAttribute("aria-valuenow", String(Math.round(fraction * 100)));
+					percent.textContent = `${Math.round(fraction * 100)} %`;
+				});
+			};
+		})();
+
+		const indeterminateMode = () => {
+			progress.classList.add("indeterminate");
+			progress.removeAttribute("aria-valuenow");
+			progress.setAttribute("aria-valuetext", "Loading");
+			percent.textContent = "";
+		};
+
+		const showError = (error) => {
+			console.error(error);
+			status.textContent = "Failed to load the application";
+			percent.textContent = "";
+			progress.hidden = true;
+			errorText.textContent = error instanceof Error ? error.message : String(error);
+			errorText.hidden = false;
+			retry.hidden = false;
+			retry.onclick = () => location.reload();
+		};
+
+		const hideLoading = () => {
+			status.textContent = "Ready";
+			loading.style.animation = "none";
+			void loading.offsetWidth;
+			loading.classList.add("is-hidden");
+			setTimeout(() => loading.remove(), 220);
+		};
+
+		const start = async () => {
+			// The wasm and the glue download in parallel. The glue is only used
+			// at the end: the loading screen does not depend on it being ready.
+			const wasmResponse = fetch(wasmUrl);
+			const glue = import("./string_art_gpui.js");
+
+			const response = await wasmResponse;
+			if (!response.ok) {
+				throw new Error(`Failed to download the wasm (HTTP ${response.status})`);
+			}
+
+			const encoding = (response.headers.get("Content-Encoding") || "").toLowerCase();
+			const uncompressed = encoding === "" || encoding === "identity";
+			const headerTotal = uncompressed
+				? Number(response.headers.get("Content-Length")) || 0
+				: 0;
+			const total = headerTotal || metaTotal;
+
+			let withProgress = response;
+			let downloadComplete = null;
+			if (total > 0 && response.body && typeof TransformStream === "function") {
+				let received = 0;
+				let markDownloadComplete;
+				downloadComplete = new Promise((resolve) => {
+					markDownloadComplete = resolve;
+				});
+
+				const counter = new TransformStream({
+					transform(chunk, control) {
+						received += chunk.byteLength;
+						paintProgress(received / total);
+						control.enqueue(chunk);
+					},
+					flush() {
+						markDownloadComplete();
+						paintProgress(1);
+					},
+				});
+
+				withProgress = new Response(
+					response.body.pipeThrough(counter),
+					{ headers: { "Content-Type": "application/wasm" } },
+				);
+			} else {
+				indeterminateMode();
+			}
+
+			const { default: init } = await glue;
+			// `init` consumes the stream and compiles. The download finishes
+			// when the TransformStream flushes, not when the glue is ready.
+			const initialization = init({ module_or_path: withProgress });
+			if (downloadComplete) {
+				downloadComplete.then(() => {
+					status.textContent = "Preparing the interface…";
+				});
+			}
+			await initialization;
+
+			// Two frames so gpui paints before removing the overlay.
+			requestAnimationFrame(() => requestAnimationFrame(hideLoading));
+		};
+
+		start().catch(showError);
+	})();
 	</script>
 </body>
 </html>

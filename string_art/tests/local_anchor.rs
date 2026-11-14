@@ -10,9 +10,9 @@
 use std::rc::Rc;
 
 use string_art::Frac;
-use string_art::computation::Pipeline;
 use string_art::Monocolor;
-use string_art::sync::{CondSend, CondSync};
+use string_art::computation::Pipeline;
+use string_art_sync::{CondSend, CondSync};
 
 /// Anchor that cannot cross threads: it holds an `Rc`.
 #[derive(Clone, Default)]
