@@ -1,0 +1,139 @@
+# Native release builds for Windows, Linux and macOS.
+#
+# Manual only (Actions > "Release build" > Run workflow).
+# By default it just builds and uploads the archives as workflow artifacts.
+# Fill in `tag` to also create/update a GitHub release with them.
+name: Release build
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "GitHub release tag (empty = only workflow artifacts)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-build
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            asset: string_art-windows-x86_64.zip
+          - name: Linux x86_64
+            # 22.04 (glibc 2.35) keeps the binary usable on older distros.
+            # The image is deprecated by GitHub from September 2026, unsupported
+            # from April 2027; bump it (or build in a container) before then.
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            asset: string_art-linux-x86_64.tar.gz
+          - name: macOS arm64
+            os: macos-latest
+            target: aarch64-apple-darwin
+            asset: string_art-macos-aarch64.tar.gz
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # gpui (X11 + Wayland, Vulkan, fontconfig, xkbcommon, ...).
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config \
+            libasound2-dev libfontconfig1-dev libfreetype-dev \
+            libwayland-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libx11-dev libx11-xcb-dev libxcb1-dev libxcb-render0-dev \
+            libxcb-shape0-dev libxcb-xfixes0-dev libxcb-composite0-dev \
+            libvulkan-dev libssl-dev libzstd-dev
+
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal --target ${{ matrix.target }}
+          rustup default stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Build (release)
+        run: cargo build --release --locked --package string_art_gpui --target ${{ matrix.target }}
+
+      # Stripping an arm64 Mach-O invalidates its ad-hoc signature, so macOS
+      # is left untouched. On Linux it saves a large chunk of the binary.
+      - name: Strip
+        if: runner.os == 'Linux'
+        run: strip "target/${{ matrix.target }}/release/string_art_gpui"
+
+      - name: Package (Linux/macOS)
+        if: runner.os != 'Windows'
+        env:
+          ASSET: ${{ matrix.asset }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          mkdir -p dist
+          tar -C "target/${TARGET}/release" -czf "dist/${ASSET}" string_art_gpui
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          ASSET: ${{ matrix.asset }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path "target/$env:TARGET/release/string_art_gpui.exe" -DestinationPath "dist/$env:ASSET"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: dist/${{ matrix.asset }}
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish GitHub release
+    if: inputs.tag != ''
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          ls -l dist
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* \
+              --target "$GITHUB_SHA" \
+              --title "$TAG" \
+              --generate-notes
+          fi

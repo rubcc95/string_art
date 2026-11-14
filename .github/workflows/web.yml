@@ -1,0 +1,164 @@
+# Web build (wasm) published to a branch that GitHub Pages serves.
+#
+# Manual only (Actions > "Deploy web" > Run workflow).
+#
+# Two variants:
+#   - threads: true  (default) `cargo +nightly web`: atomics + shared memory, real
+#     workers. The module needs cross-origin isolation, and GitHub Pages cannot
+#     send COOP/COEP, so a tiny service worker (.github/web/coi-serviceworker.js)
+#     is added to the deployed site. The first visit reloads once to become
+#     isolated.
+#   - threads: false `cargo web-serial`: single-threaded, no SharedArrayBuffer,
+#     no service worker. Use it if the isolation workaround is not wanted.
+name: Deploy web
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch that GitHub Pages publishes"
+        required: false
+        default: gh-pages
+      threads:
+        description: "Multithreaded wasm (nightly). Adds the COOP/COEP service worker."
+        type: boolean
+        default: true
+      profile:
+        description: "Cargo profile"
+        type: choice
+        options:
+          - release
+          - debug
+        default: release
+
+permissions:
+  contents: write
+
+concurrency:
+  group: web-deploy
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+
+jobs:
+  deploy:
+    name: Build and publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        run: |
+          if [ "${{ inputs.threads }}" = "true" ]; then
+            # build-std needs rust-src to rebuild the wasm std with atomics.
+            rustup toolchain install nightly --profile minimal \
+              --component rust-src --target wasm32-unknown-unknown
+          else
+            rustup toolchain install stable --profile minimal \
+              --target wasm32-unknown-unknown
+            rustup default stable
+          fi
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: wasm-${{ inputs.threads }}-${{ inputs.profile }}
+
+      # The CLI and the `wasm-bindgen` crate must be exactly the same version.
+      - name: Install wasm-bindgen-cli
+        run: |
+          VERSION=$(awk '/^name = "wasm-bindgen"$/ { getline; sub(/^version = "/, ""); sub(/"$/, ""); print; exit }' Cargo.lock)
+          echo "wasm-bindgen $VERSION"
+          cargo install wasm-bindgen-cli --version "$VERSION" --locked
+
+      - name: Build wasm
+        shell: bash
+        env:
+          THREADS: ${{ inputs.threads }}
+          PROFILE: ${{ inputs.profile }}
+        run: |
+          set -euo pipefail
+          flags=()
+          if [ "$PROFILE" = "release" ]; then
+            flags+=(--release)
+          fi
+          if [ "$THREADS" = "true" ]; then
+            cargo +nightly web --locked "${flags[@]}"
+          else
+            cargo web-serial --locked "${flags[@]}"
+          fi
+
+      - name: Run wasm-bindgen
+        shell: bash
+        env:
+          PROFILE: ${{ inputs.profile }}
+        run: |
+          set -euo pipefail
+          wasm-bindgen \
+            --target web \
+            --out-dir string_art_gpui/web \
+            --out-name string_art_gpui \
+            "target/wasm32-unknown-unknown/${PROFILE}/string_art_gpui.wasm"
+
+      - name: Prepare site
+        shell: bash
+        env:
+          THREADS: ${{ inputs.threads }}
+        run: |
+          set -euo pipefail
+          web=string_art_gpui/web
+          wasm="$web/string_art_gpui_bg.wasm"
+
+          # index.html uses this to size the download progress bar.
+          size=$(stat -c %s "$wasm")
+          sed -i -E "s/(name=\"wasm-bytes\" content=\")[0-9]+(\")/\1${size}\2/" "$web/index.html"
+
+          rm -rf site
+          mkdir -p site
+          cp "$web/index.html" "$web/string_art_gpui.js" "$wasm" "$web"/*.d.ts site/
+          touch site/.nojekyll
+
+          if [ "$THREADS" = "true" ]; then
+            # GitHub Pages cannot set COOP/COEP; the worker synthesises them so
+            # SharedArrayBuffer (and therefore the wasm threads) is available.
+            cp .github/web/coi-serviceworker.js site/
+            grep -q "coi-serviceworker.js" site/index.html ||
+              sed -i 's#</head>#<script src="coi-serviceworker.js"></script>\n</head>#' site/index.html
+          fi
+
+      - name: Publish to the Pages branch
+        shell: bash
+        env:
+          BRANCH: ${{ inputs.branch || 'gh-pages' }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd site
+          git init -q
+          git checkout -q -b "$BRANCH"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q --allow-empty -m "Web build ${GITHUB_SHA}"
+          git push --force \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            "HEAD:refs/heads/${BRANCH}"
+
+      - name: Summary
+        env:
+          BRANCH: ${{ inputs.branch || 'gh-pages' }}
+        run: |
+          {
+            echo "### Web build published"
+            echo ""
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Branch | \`${BRANCH}\` |"
+            echo "| Threads | \`${{ inputs.threads }}\` |"
+            echo "| Profile | \`${{ inputs.profile }}\` |"
+            echo "| Commit | \`${GITHUB_SHA}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
