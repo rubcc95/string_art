@@ -12,3 +12,5 @@
 !*/example/*.jpg
 !*/example/*.png
 !*/example/*.svg
+
+.playwright-mcp/
