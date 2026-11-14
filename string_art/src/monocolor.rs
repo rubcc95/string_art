@@ -1,13 +1,32 @@
 use std::iter::FusedIterator;
 
-use crate::{Color, ColorMap, computation::*, num::*, sync::*};
+use crate::{Color, computation::*, num::*, sync::*};
 
 pub struct Monocolor<A> {
-    pub map: ColorMap<A, Black>,
-    pub threads: u32,
+    map: ColorMap<A, Black>,
+    threads: u32,
+}
+
+impl<A> Monocolor<A> {
+    /// Pesos del único mapa de color del pipeline.
+    pub fn weights(&self) -> &[Frac] {
+        &self.map.weights
+    }
 }
 
 impl<A: Default> Monocolor<A> {
+    #[inline]
+    pub fn new(anchor: A, weights: Vec<Frac>, threads: u32) -> Self {
+        Self {
+            map: ColorMap {
+                anchor,
+                weights,
+                color: Black,
+            },
+            threads,
+        }
+    }
+
     #[cfg(feature = "image")]
     pub fn from_image(
         image: &impl image::GenericImageView<Pixel: image::Pixel<Subpixel = u8>>,

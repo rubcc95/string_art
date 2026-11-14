@@ -1,31 +1,11 @@
-# Build de la app web con hilos reales (SharedArrayBuffer).
+# Atajos de build web.
 #
-# Sin `+atomics` el módulo no usa memoria compartida y `wasm_thread` no puede
-# arrancar workers. `+bulk-memory` y `+mutable-globals` completan lo que exige
-# instanciar el mismo módulo en varios workers compartiendo la memoria.
+# `cargo web` compila en estable y sin hilos: sin SharedArrayBuffer, sin
+# workers y con un wasm más pequeño. La app usa Serial.
 #
-# Solo aplica al target wasm: el build nativo no se toca.
-[target.wasm32-unknown-unknown]
-rustflags = [
-  "-C", "target-feature=+atomics,+bulk-memory,+mutable-globals",
-  "-C", "link-arg=--shared-memory",
-  "-C", "link-arg=--max-memory=1073741824",
-  "-C", "link-arg=--import-memory",
-  "-C", "link-arg=--export=__wasm_init_tls",
-  "-C", "link-arg=--export=__tls_size",
-  "-C", "link-arg=--export=__tls_align",
-  "-C", "link-arg=--export=__tls_base",
-]
-
-# Recompila std y el runtime de pánico desde fuente. El std precompilado de
-# wasm32 no trae soporte de atomics, así que sin esto los workers no arrancan.
-# Requiere el componente rust-src del toolchain nightly.
-#
-# Cargo solo lo aplica cuando se pasa `--target`, así que los builds nativos
-# no se ven afectados.
-[unstable]
-build-std = ["std", "panic_abort"]
-
-# Atajo para el build web: `cargo +nightly web`.
+# `cargo +nightly web-threads` compila con hilos reales. Necesita nightly +
+# rust-src porque hay que recompilar la std de wasm con atomics (ver
+# web-threads.toml), y la página tiene que servirse con COOP/COEP.
 [alias]
-web = "build -p string_art_gpui --target wasm32-unknown-unknown"
+web = "build -p string_art_gpui --target wasm32-unknown-unknown --no-default-features"
+web-threads = "build -p string_art_gpui --target wasm32-unknown-unknown --config .cargo/web-threads.toml"

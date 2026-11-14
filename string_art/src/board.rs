@@ -1,17 +1,19 @@
-
 use derive_more::Deref;
-use crate::sync::*;
+use string_art_sync::CondSync;
 
 type Seg = crate::geometry::Segment<f32>;
 
-pub trait IntoBoard{
+pub trait IntoBoard {
     type Board: Board;
 
     fn into_board(self, cpus: usize) -> Self::Board;
 }
 
-pub trait Board : CondSync{
-    type Anchor: Clone + Default + CondSend + CondSync;    
+pub trait Board: CondSync {
+    #[cfg(feature = "multithreaded")]
+    type Anchor: Clone + Default + Send + Sync;
+    #[cfg(not(feature = "multithreaded"))]
+    type Anchor: Clone + Default;
 
     fn batch<'a>(
         &'a self,
@@ -32,13 +34,6 @@ pub trait SegmentRef {
     fn index(&self) -> usize;
 
     fn anchor(&self) -> Self::Anchor;
-}
-
-pub trait Batched {
-    type Anchor;
-    type Ref: SegmentRef<Anchor = Self::Anchor>;
-
-    fn segments(&self) -> impl Iterator<Item = Self::Ref>;
 }
 
 #[derive(Clone, Debug, Deref)]

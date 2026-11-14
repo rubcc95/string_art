@@ -1,20 +1,27 @@
-pub mod anchor;
+mod anchor;
 pub mod circular;
-pub mod point;
+mod point;
 
 pub use anchor::Anchor;
-pub use circular::UniformCircular;
+pub use circular::Circular;
 pub use point::Point;
 
-use crate::sync::*;
 use crate::geometry;
-
+use crate::sync::*;
 
 pub trait Builder {
-    type Nail: CondSync;
+    #[cfg(feature = "multithreaded")]
+    type Nail: Sync;
+    #[cfg(not(feature = "multithreaded"))]
+    type Nail;
     type Links: Links<Link = Self::Link>;
     type Handle: Handle<Link = Self::Link, Nail = Self::Nail>;
-    type Link: Clone + CondSync + CondSend + Default;
+
+    #[cfg(feature = "multithreaded")]
+    type Link: Clone + Sync + Send + Default;
+    #[cfg(not(feature = "multithreaded"))]
+    type Link: Clone + Default;
+
     type Error: std::error::Error;
 
     const LINKS: Self::Links;
