@@ -15,7 +15,7 @@ pub trait Pipeline: Iterator<Item = Self::Index> {
     #[cfg(feature = "multithreaded")]
     type Anchor: Send + Sync + Clone;
     #[cfg(not(feature = "multithreaded"))]
-    type Anchor = Clone;
+    type Anchor: Clone;
     type Color: Clone;
     type Index: Clone + Into<usize>;
 

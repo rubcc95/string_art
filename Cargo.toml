@@ -19,7 +19,6 @@ string_art_sync = { path = "string_art/string_art_sync", default-features = fals
 string_art_geometry = { path = "string_art/string_art_geometry", default-features = false }
 string_art_grid = { path = "string_art/string_art_grid" }
 string_art_serial = { path = "string_art/string_art_serial" }
-string_art_rayon = { path = "string_art/string_art_rayon" }
 string_art_color = { path = "string_art/string_art_color", default-features = false }
 
 num-traits = "^0.2"

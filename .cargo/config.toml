@@ -7,5 +7,5 @@
 # rust-src because the wasm std has to be rebuilt with atomics (see
 # web-threads.toml), and the page has to be served with COOP/COEP.
 [alias]
-web = "build -p string_art_gpui --target wasm32-unknown-unknown --no-default-features"
-web-threads = "build -p string_art_gpui --target wasm32-unknown-unknown --config .cargo/web-threads.toml"
+web-serial = "build -p string_art_gpui --target wasm32-unknown-unknown --no-default-features"
+web = "build -p string_art_gpui --target wasm32-unknown-unknown --config .cargo/web.toml"
