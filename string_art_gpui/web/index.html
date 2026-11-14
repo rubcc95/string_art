@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -14,7 +14,7 @@
 		color: #eeeeee;
 		font-family: system-ui, -apple-system, sans-serif;
 	}
-	#estado {
+	#status {
 		position: absolute;
 		inset: 0;
 		display: flex;
@@ -27,38 +27,38 @@
 		font-size: 15px;
 		line-height: 1.5;
 	}
-	#estado small {
+	#status small {
 		color: #9a9a9a;
 		font-size: 13px;
 	}
 </style>
 </head>
 <body>
-	<div id="estado">
-		<strong>cargando String Art…</strong>
-		<small id="detalle">compilando el módulo</small>
+	<div id="status">
+		<strong>loading String Art…</strong>
+		<small id="detail">compiling the module</small>
 	</div>
 
 	<script type="module">
-		const estado = document.getElementById("estado");
-		const detalle = document.getElementById("detalle");
+		const status = document.getElementById("status");
+		const detail = document.getElementById("detail");
 
-		// Sin aislamiento de origen no hay SharedArrayBuffer y gpui cae a un
-		// solo hilo. Se avisa en vez de dejar que parezca que va lento.
-		const aislado = globalThis.crossOriginIsolated === true;
-		const haySab = typeof SharedArrayBuffer !== "undefined";
+		// Without origin isolation there is no SharedArrayBuffer and gpui falls
+		// back to a single thread. We warn instead of letting it look slow.
+		const isolated = globalThis.crossOriginIsolated === true;
+		const hasSharedArrayBuffer = typeof SharedArrayBuffer !== "undefined";
 
-		detalle.textContent = aislado && haySab
-			? `memoria compartida sí · ${navigator.hardwareConcurrency} núcleos`
-			: `sin aislamiento de origen (COOP/COEP) · un solo hilo`;
+		detail.textContent = isolated && hasSharedArrayBuffer
+			? `shared memory available · ${navigator.hardwareConcurrency} cores`
+			: `no origin isolation (COOP/COEP) · single thread`;
 
 		try {
 			const { default: init } = await import("./string_art_gpui.js");
 			await init();
-			estado.remove();
+			status.remove();
 		} catch (error) {
-			estado.innerHTML =
-				`<strong>Error al arrancar</strong><small>${String(error)}</small>`;
+			status.innerHTML =
+				`<strong>Failed to start</strong><small>${String(error)}</small>`;
 			console.error(error);
 		}
 	</script>

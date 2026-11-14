@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Sirve la app con las cabeceras que necesita SharedArrayBuffer.
+"""Serves the app with the headers SharedArrayBuffer requires.
 
-Sin COOP/COEP el navegador no expone `SharedArrayBuffer`, y sin él gpui no
-puede crear sus hilos: arranca en modo monohilo.
+Without COOP/COEP the browser does not expose `SharedArrayBuffer`, and without
+it gpui cannot create its threads: it starts in single-threaded mode.
 
-    python3 serve.py [puerto]
+    python3 serve.py [port]
 """
 
 from __future__ import annotations
@@ -14,12 +14,12 @@ import os
 import sys
 from typing import Any
 
-PUERTO = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
+PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
-    # La clase base lo declara como atributo de instancia, no como ClassVar
-    # (anotarlo así haría que Pyright se queje); RUF012 se silencia a propósito.
+    # The base class declares it as an instance attribute, not as a ClassVar
+    # (annotating it that way would make Pyright complain); RUF012 is silenced on purpose.
     extensions_map: dict[str, str] = {  # noqa: RUF012
         **http.server.SimpleHTTPRequestHandler.extensions_map,
         ".wasm": "application/wasm",
@@ -34,21 +34,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         super().end_headers()
 
-    # El parámetro debe llamarse `format` para coincidir con la firma base.
+    # The parameter must be named `format` to match the base signature.
     def log_message(self, format: str, *args: Any) -> None:
         sys.stderr.write(f"{format % args}\n")
 
 
 def main() -> None:
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
-    print(f"http://127.0.0.1:{PUERTO}/", flush=True)
-    servidor = http.server.ThreadingHTTPServer(("127.0.0.1", PUERTO), Handler)
+    print(f"http://127.0.0.1:{PORT}/", flush=True)
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     try:
-        servidor.serve_forever()
+        server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
-        servidor.server_close()
+        server.server_close()
 
 
 if __name__ == "__main__":

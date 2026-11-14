@@ -12,8 +12,8 @@ members = [
 ]
 
 [workspace.dependencies]
-# Crates internos. Las rutas son relativas a este manifiesto, así que los
-# miembros no dependen de dónde estén colocados dentro del workspace.
+# Internal crates. Paths are relative to this manifest, so the
+# members do not depend on where they are placed inside the workspace.
 string_art = { path = "string_art" }
 string_art_sync = { path = "string_art/string_art_sync", default-features = false }
 string_art_geometry = { path = "string_art/string_art_geometry", default-features = false }
@@ -24,8 +24,8 @@ string_art_color = { path = "string_art/string_art_color", default-features = fa
 
 num-traits = "^0.2"
 thiserror = "^2.0"
-# Sin defaults: los formatos que haga falta los activa quien decodifique. Con
-# los defaults, `image` arrastra el encoder AVIF (`ravif`/`rav1e`) a todos.
+# No defaults: the formats that are needed are enabled by whoever decodes. With
+# the defaults, `image` pulls the AVIF encoder (`ravif`/`rav1e`) into everyone.
 image = { version = "^0.25", default-features = false }
 serde = { version = "^1.0", features = ["derive"] }
 derive_more = { version = "^2.0", features = ["deref", "deref_mut", "from"] }

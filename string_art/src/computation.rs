@@ -50,7 +50,7 @@ impl<'a, B, P: Pipeline, X: Executor> Computation<B, P, X> {
         &self.pipeline
     }
 
-    /// Backend de paralelismo con el que se creó.
+    /// The parallelism backend it was created with.
     pub fn par(&self) -> &X {
         &self.inner.par
     }
@@ -206,8 +206,8 @@ where
                     }
                 };
 
-                // Desempate por índice de segmento: así el resultado no depende
-                // de cómo se repartan los candidatos entre hilos.
+                // Tie-break by segment index: this way the result does not depend
+                // on how the candidates are distributed among threads.
                 let better = match next_line {
                     Some(current) => {
                         (weight, segment.index()) > (current.weight, current.next.segment_idx)

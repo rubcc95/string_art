@@ -1,9 +1,10 @@
 use string_art_sync::Executor;
 
-/// Pool de rayon propio, con un número de hilos fijo.
+/// Its own rayon pool, with a fixed number of threads.
 ///
-/// Tener el pool aquí (y no el global de rayon) permite elegir el número
-/// de hilos en runtime y medirlo sin tocar variables de entorno.
+/// Having the pool here (and not rayon's global one) makes it possible to
+/// choose the number of threads at runtime and measure it without touching
+/// environment variables.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SerialExec;
 

@@ -19,8 +19,8 @@ fn test_image(size: u32) -> image::RgbImage {
     })
 }
 
-/// Igual que [`run`], pero devuelve el tiempo de la fase de cálculo (los
-/// [`STEPS`] pasos), sin contar la preparación de imagen, mapa y tablero.
+/// Same as [`run`], but returns the time of the computation phase (the
+/// [`STEPS`] steps), not counting image, map, and board preparation.
 pub fn run_timed<X: Executor>(par: X) -> f64 {
     let image = test_image(SIZE);
     let monocolor: Monocolor<Anchor<Direction>> = Monocolor::from_image(&image, STEPS);
@@ -30,7 +30,7 @@ pub fn run_timed<X: Executor>(par: X) -> f64 {
         NAILS,
         MIN_DISTANCE,
     )
-    .expect("tablero inválido");
+    .expect("invalid board");
     let rect = Rect::new(SIZE as usize, SIZE as usize);
 
     let computation = Computation::new(
@@ -40,11 +40,11 @@ pub fn run_timed<X: Executor>(par: X) -> f64 {
         rect,
         Decay::Flat(Frac::from_num(0.2)),
     )
-    .expect("el mapa de color no cuadra con el área");
+    .expect("the color map does not match the area");
 
     let start = web_time::Instant::now();
     computation
-        .map(|step| step.expect("paso fallido"))
+        .map(|step| step.expect("failed step"))
         .for_each(drop);
     start.elapsed().as_secs_f64() * 1000.0
 }
@@ -67,8 +67,8 @@ mod tests {
 
     #[test]
     fn gpui_exec() {
-        // Mismo pool (available_parallelism) y misma cola de prioridad que el
-        // dispatcher de Linux, pero sin ventana ni bucle de eventos.
+        // Same pool (available_parallelism) and same priority queue as the
+        // Linux dispatcher, but without a window or event loop.
         let exec = BackgroundExecutor::new(Arc::new(ThreadedDispatcher::new()));
         let (tx, rx) = mpsc::channel();
 
@@ -82,12 +82,12 @@ mod tests {
         })
         .detach();
 
-        let mut times = rx.recv().expect("la tarea del bench se cayó");
-        times.remove(0); // calentamiento
+        let mut times = rx.recv().expect("the bench task crashed");
+        times.remove(0); // warm-up
         times.sort_by(f64::total_cmp);
-        println!("muestras: {times:?}");
+        println!("samples: {times:?}");
         println!(
-            "min {:.1} ms | mediana {:.1} ms",
+            "min {:.1} ms | median {:.1} ms",
             times[0],
             times[times.len() / 2]
         );

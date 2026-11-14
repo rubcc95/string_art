@@ -1,4 +1,4 @@
-//! La aplicación: ventana de gpui que mide el cálculo secuencial y en paralelo.
+//! The application: a gpui window that measures sequential and parallel computation.
 
 #![cfg_attr(target_family = "wasm", no_main)]
 
@@ -93,7 +93,7 @@ impl Render for View {
                             .rounded_md()
                             .bg(rgb(0x2563eb))
                             .cursor_pointer()
-                            .child("Secuencial")
+                            .child("Sequential")
                             .on_click(cx.listener(|this, _, _, cx| this.start(false, cx))),
                     )
                     .child(
@@ -104,17 +104,17 @@ impl Render for View {
                             .rounded_md()
                             .bg(rgb(0x2563eb))
                             .cursor_pointer()
-                            .child("Paralelo")
+                            .child("Parallel")
                             .on_click(cx.listener(|this, _, _, cx| this.start(true, cx))),
                     ),
             )
             .child(format!(
-                "Secuencial: {}",
+                "Sequential: {}",
                 self.serial_ms
                     .map_or_else(|| "—".to_string(), |ms| format!("{ms:.1} ms"))
             ))
             .child(format!(
-                "Paralelo: {}",
+                "Parallel: {}",
                 self.parallel_ms
                     .map_or_else(|| "—".to_string(), |ms| format!("{ms:.1} ms"))
             ))

@@ -1,9 +1,9 @@
-//! Con la feature `threads` apagada no hay ningún backend que cruce hilos, así
-//! que `CondSend`/`CondSync` son vacíos: un `Anchor` con `Rc` dentro tiene que
-//! valer igual.
+//! With the `threads` feature disabled there is no backend that crosses
+//! threads, so `CondSend`/`CondSync` are empty: an `Anchor` with an `Rc` inside
+//! must still work.
 //!
-//! Con `threads` encendida este fichero queda vacío a propósito: ese mismo
-//! código dejaría de compilar, porque entonces `CondSend` es `Send` de verdad.
+//! With `threads` enabled this file is intentionally left empty: that same
+//! code would stop compiling, because then `CondSend` is `Send` for real.
 
 #![cfg(not(feature = "multithreaded"))]
 
@@ -14,7 +14,7 @@ use string_art::computation::Pipeline;
 use string_art::Monocolor;
 use string_art::sync::{CondSend, CondSync};
 
-/// Ancla que no puede cruzar hilos: lleva un `Rc`.
+/// Anchor that cannot cross threads: it holds an `Rc`.
 #[derive(Clone, Default)]
 #[allow(dead_code)]
 struct LocalAnchor(Rc<()>);
@@ -24,13 +24,13 @@ fn assert_cond<T: CondSend + CondSync>() {}
 fn assert_pipeline<P: Pipeline<Anchor = LocalAnchor>>() {}
 
 #[test]
-fn cualquier_tipo_es_cond_send_sin_hilos() {
+fn any_type_is_cond_send_without_threads() {
     assert_cond::<Rc<()>>();
     assert_cond::<LocalAnchor>();
 }
 
 #[test]
-fn el_pipeline_admite_un_ancla_que_no_es_send() {
+fn the_pipeline_accepts_an_anchor_that_is_not_send() {
     assert_pipeline::<Monocolor<LocalAnchor>>();
 
     let monocolor = Monocolor::<LocalAnchor>::new(LocalAnchor::default(), vec![Frac::ZERO; 4], 1);

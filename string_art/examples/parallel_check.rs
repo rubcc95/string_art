@@ -1,11 +1,11 @@
-// //! Comprueba que el backend paralelo da exactamente el mismo resultado que
-// //! el serial, y cuánto tarda cada uno.
+// //! Checks that the parallel backend gives exactly the same result as
+// //! the serial one, and how long each one takes.
 // //!
-// //! Es la red de seguridad del reparto de trabajo: si cambia el troceado del
-// //! tablero, el resultado no debe moverse.
+// //! It is the safety net for the work distribution: if the board chunking
+// //! changes, the result must not move.
 // //!
-// //! Necesita la feature `threads`: sin ella solo existe `Serial` y no hay nada
-// //! que comparar.
+// //! It requires the `threads` feature: without it only `Serial` exists and
+// //! there is nothing to compare.
 
 // fn main() {
 //     #[cfg(feature = "multithreaded")]
@@ -13,8 +13,8 @@
 
 //     #[cfg(not(feature = "multithreaded"))]
 //     println!(
-//         "Sin la feature `threads` solo existe `Serial`: no hay backend paralelo \
-//          con el que comparar. Compílalo con `cargo run --example parallel_check \
+//         "Without the `threads` feature only `Serial` exists: there is no parallel \
+//          backend to compare against. Compile it with `cargo run --example parallel_check \
 //          --features threads`."
 //     );
 // }
@@ -41,7 +41,7 @@
 //         })
 //     }
 
-//     /// Ejecuta `steps` pasos y devuelve la traza completa.
+//     /// Runs `steps` steps and returns the full trace.
 //     fn run<X: Parallel>(par: X, steps: u32) -> Vec<(usize, u8, f32, f32)> {
 //         let image = test_image(SIZE);
 //         let monocolor: Monocolor<nails::Anchor<Direction>> = Monocolor::from_image(&image, steps);
@@ -51,7 +51,7 @@
 //             NAILS,
 //             MIN_DISTANCE,
 //         )
-//         .expect("tablero inválido");
+//         .expect("invalid board");
 //         let rect = Rect::new(SIZE as usize, SIZE as usize);
 
 //         let computation = Computation::new(
@@ -61,11 +61,11 @@
 //             rect,
 //             Decay::Flat(Frac::from_num(0.2)),
 //         )
-//         .expect("el mapa de color no cuadra con el área");
+//         .expect("the color map does not match the area");
 
 //         computation
 //             .map(|step| {
-//                 let step = step.expect("paso fallido");
+//                 let step = step.expect("failed step");
 //                 (
 //                     step.anchor.idx,
 //                     u8::try_from(usize::from(step.anchor.link)).unwrap_or(0),
@@ -90,12 +90,12 @@
 //         let parallel_us = start.elapsed().as_micros();
 
 //         println!(
-//             "Serial: {:>10.2} ms  ({} pasos, 1 hilo)",
+//             "Serial: {:>10.2} ms  ({} steps, 1 thread)",
 //             serial_us as f64 / 1000.0,
 //             serial.len()
 //         );
 //         println!(
-//             "Rayon : {:>10.2} ms  ({} pasos, {} hilos)",
+//             "Rayon : {:>10.2} ms  ({} steps, {} threads)",
 //             parallel_us as f64 / 1000.0,
 //             parallel.len(),
 //             workers
@@ -105,7 +105,7 @@
 //         }
 
 //         if serial == parallel {
-//             println!("OK: mismo resultado paso a paso.");
+//             println!("OK: same result step by step.");
 //         } else {
 //             let first = serial
 //                 .iter()
@@ -113,7 +113,7 @@
 //                 .position(|(a, b)| a != b)
 //                 .unwrap_or(0);
 //             eprintln!(
-//                 "DIFERENTE en el paso {first}: {:?} != {:?}",
+//                 "DIFFERENT at step {first}: {:?} != {:?}",
 //                 serial.get(first),
 //                 parallel.get(first)
 //             );

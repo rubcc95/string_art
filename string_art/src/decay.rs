@@ -1,11 +1,11 @@
 use crate::num::Frac;
 
-/// Cómo se reduce la energía de un píxel cuando pasa un hilo por encima.
+/// How a pixel's energy is reduced when a thread passes over it.
 #[derive(Clone, Copy, Debug)]
 pub enum Decay {
-    /// Resta una cantidad fija. Se satura en cero.
+    /// Subtracts a fixed amount. Saturates at zero.
     Flat(Frac),
-    /// Conserva un porcentaje de la energía (entre 0 y 1).
+    /// Keeps a percentage of the energy (between 0 and 1).
     Percentage(Frac),
 }
 
