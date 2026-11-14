@@ -74,8 +74,8 @@ impl<B: nails::Builder> Board for EllipseBoard<B> {
                     ),
                 };
                 SegmentRef::<B> {
-                    // Si esto revienta, el culpable es `index_of` o el contrato de
-                    // `Links` (orden de iteración vs `index_of`), no quien llama.
+                    // If this blows up, the culprit is `index_of` or the
+                    // `Links` contract (iteration order vs `index_of`), not the caller.
                     segment: &self.segments[index],
                     next_anchor: self.handle.next_anchor(nails::Anchor {
                         idx: to_idx,

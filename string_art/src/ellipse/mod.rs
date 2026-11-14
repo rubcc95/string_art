@@ -12,8 +12,8 @@ pub struct Ellipse<N: nails::Builder> {
     handle: N::Handle,
     min_nail_distance: usize,
     nail_count: usize,
-    // No se lee después de construir, pero se conserva como parte del estado
-    // del tablero. Si un consumidor lo necesita, se añadirá un accesor.
+    // Not read after construction, but kept as part of the board
+    // state. If a consumer needs it, an accessor will be added.
     #[allow(dead_code)]
     nails: Vec<N::Nail>,
 }
@@ -25,9 +25,9 @@ impl<N: nails::Builder> Ellipse<N> {
         nail_count: usize,
         min_nail_distance: usize,
     ) -> Result<Self, Error<N::Error>> {
-        // La cota no es opcional: `into_board` calcula `nail_count - 2 * min - 1`
-        // y `index_of` despeja `nail_count - (min + 1)`. Con `min` demasiado
-        // grande eso desborda (en release, envolviendo el índice de segmento).
+        // The bound is not optional: `into_board` computes `nail_count - 2 * min - 1`
+        // and `index_of` solves for `nail_count - (min + 1)`. With `min` too
+        // large that overflows (in release, wrapping the segment index).
         let max_distance = nail_count.saturating_sub(1) / 2;
         if min_nail_distance > max_distance {
             return Err(Error::Distancer(max_distance));
@@ -71,24 +71,24 @@ impl<N: nails::Builder> Ellipse<N> {
         Ok(this)
     }
 
-    /// Verifica una sola vez, y solo en debug, el contrato de `Links`: que el
-    /// iterador produzca `LEN` enlaces y que `Handle::index_of` los numere de
-    /// `0` a `LEN - 1` sin repetir. Es el chequeo que sustituye a la antigua
-    /// promesa del `unsafe trait`.
+    /// Verifies once, and only in debug, the `Links` contract: that the
+    /// iterator yields `LEN` links and that `Handle::index_of` numbers them from
+    /// `0` to `LEN - 1` without repeats. It is the check that replaces the old
+    /// `unsafe trait` promise.
     #[cfg(debug_assertions)]
     fn debug_assert_links(handle: &N::Handle) {
         let links: Vec<_> = N::LINKS.into_iter().collect();
         assert_eq!(
             links.len(),
             <N::Links as nails::Links>::LEN,
-            "El iterador de `Links` produce un número de enlaces distinto de `LEN`"
+            "The `Links` iterator yields a different number of links than `LEN`"
         );
         let mut seen = vec![false; links.len()];
         for link in &links {
             let idx = handle.index_of(link);
             assert!(
                 idx < seen.len() && !seen[idx],
-                "`Handle::index_of` debe numerar los enlaces de 0 a LEN - 1 sin repetir; devolvió {idx} con LEN = {}",
+                "`Handle::index_of` must number the links from 0 to LEN - 1 without repeats; returned {idx} with LEN = {}",
                 seen.len()
             );
             seen[idx] = true;
@@ -191,8 +191,8 @@ mod test {
     use super::*;
     use internal::EllipseBoard;
 
-    /// Helper de debug solo para estos tests. Antes vivía en
-    /// `nails::anchor::Debugger`, pero no forma parte de la API pública.
+    /// Debug helper just for these tests. It used to live in
+    /// `nails::anchor::Debugger`, but it is not part of the public API.
     struct Debugger<'a, H, L> {
         handle: &'a H,
         anchor: &'a Anchor<L>,
@@ -287,8 +287,8 @@ mod test {
         test_ellipse(Point, 123, 1, 10);
     }
 
-    /// Antes estas cotas desbordaban `into_board` en lugar de devolver el error
-    /// que la API ya declaraba: `Distancer` era una variante muerta.
+    /// These bounds used to overflow `into_board` instead of returning the error
+    /// that the API already declared: `Distancer` was a dead variant.
     #[test]
     fn rejects_min_distance_too_large() {
         let result = Ellipse::new(Rect::new(10.0, 10.0), Point, 10, 5);

@@ -1,5 +1,5 @@
 {
     "rust-analyzer.cargo.allFeatures": false,
-    "rust-analyzer.cargo.features": ["native"], // Lista explícita de features si quieres
-    "rust-analyzer.cargo.noDefaultFeatures": false // true si quieres ignorar las default del crate
+    "rust-analyzer.cargo.features": ["native"], // Explicit list of features if you want
+    "rust-analyzer.cargo.noDefaultFeatures": false // true if you want to ignore the crate's default features
 }

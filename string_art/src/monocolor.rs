@@ -8,7 +8,7 @@ pub struct Monocolor<A> {
 }
 
 impl<A> Monocolor<A> {
-    /// Pesos del único mapa de color del pipeline.
+    /// Weights of the pipeline's single color map.
     pub fn weights(&self) -> &[Frac] {
         &self.map.weights
     }

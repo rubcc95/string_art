@@ -1,9 +1,9 @@
-//! Sin la feature `threads` ningún backend cruza hilos, así que `CondSend` y
-//! `CondSync` están vacíos: el cálculo monohilo tiene que aceptar **cualquier**
-//! tipo, `Rc` incluido.
+//! Without the `threads` feature no backend crosses threads, so `CondSend` and
+//! `CondSync` are empty: the single-threaded computation has to accept **any**
+//! type, `Rc` included.
 //!
-//! Con `threads` encendida este fichero queda vacío: ese mismo código deja de
-//! compilar, que es exactamente lo que debe pasar.
+//! With `threads` enabled this file becomes empty: that same code stops
+//! compiling, which is exactly what should happen.
 
 #![cfg(not(feature = "multithreaded"))]
 
@@ -14,14 +14,14 @@ use string_art_sync::{CondSend, CondSync, Executor, Serial};
 fn assert_cond<T: CondSend + CondSync>() {}
 
 #[test]
-fn cualquier_tipo_es_cond_send_y_cond_sync_sin_hilos() {
+fn any_type_is_cond_send_and_cond_sync_without_threads() {
     assert_cond::<Rc<()>>();
     assert_cond::<Vec<Rc<()>>>();
     assert_cond::<*const u8>();
 }
 
 #[test]
-fn serial_acepta_un_buffer_que_no_es_send() {
+fn serial_accepts_a_buffer_that_is_not_send() {
     let mut bufs: Vec<Option<Rc<u8>>> = vec![None, None];
 
     Serial.for_each(&mut bufs, |index, slot| {
@@ -35,7 +35,7 @@ fn serial_acepta_un_buffer_que_no_es_send() {
 }
 
 #[test]
-fn serial_acepta_un_cierre_que_no_es_send() {
+fn serial_accepts_a_closure_that_is_not_send() {
     let shared = Rc::new(0u8);
     let mut bufs = [0u8; 2];
 

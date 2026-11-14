@@ -37,22 +37,22 @@ pub trait Builder {
     fn anchor_builder(self) -> Self::Handle;
 }
 
-/// Conjunto de enlaces que salen de un clavo.
+/// Set of links that leave a nail.
 ///
-/// La implementación habitual es un array —`[Direction; 2]`, `[Link; 1]`—, que
-/// obtiene `LEN` de su propia longitud. Si alguien implementa esto a mano:
+/// The usual implementation is an array —`[Direction; 2]`, `[Link; 1]`—, which
+/// takes `LEN` from its own length. If someone implements this by hand:
 ///
-/// # Contrato
+/// # Contract
 ///
-/// * `LEN` debe coincidir con el número de elementos que produce el iterador.
-/// * `Handle::index_of` debe numerar esos enlaces de `0` a `LEN - 1`, sin
-///   repetir y **en el mismo orden en que los recorre el iterador**.
+/// * `LEN` must match the number of elements the iterator produces.
+/// * `Handle::index_of` must number those links from `0` to `LEN - 1`, without
+///   repeating and **in the same order in which the iterator traverses them**.
 ///
-/// Lo segundo no es cosmético: `EllipseBoard::index_of` usa ese número como
-/// coordenada dentro de un bloque de `LEN * LEN` segmentos. Un desajuste
-/// produce índices equivocados; el acceso al segmento va comprobado, así que
-/// eso es un panic y no una lectura fuera de rango. `Ellipse::new` lo
-/// verifica en debug.
+/// The second point is not cosmetic: `EllipseBoard::index_of` uses that number as
+/// a coordinate inside a block of `LEN * LEN` segments. A mismatch
+/// produces wrong indexes; access to the segment is checked, so
+/// that is a panic and not an out-of-range read. `Ellipse::new` verifies it
+/// in debug.
 pub trait Links: IntoIterator<Item = Self::Link> {
     type Link;
 
@@ -60,8 +60,8 @@ pub trait Links: IntoIterator<Item = Self::Link> {
     const SQ_LEN: usize = Self::LEN * Self::LEN;
 }
 
-/// La longitud la lleva el tipo, así que `LEN` no puede discrepar del número de
-/// elementos que produce el iterador. Es lo que sustituye al antiguo
+/// The length is carried by the type, so `LEN` cannot disagree with the number of
+/// elements the iterator produces. This is what replaces the former
 /// `unsafe impl`.
 impl<L, const N: usize> Links for [L; N] {
     type Link = L;

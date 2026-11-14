@@ -1,25 +1,25 @@
-//! Tipos numéricos del core.
+//! Core numeric types.
 //!
-//! No hay configuración: todo el cálculo de energía va en punto fijo de 64 bits.
+//! There is no configuration: all energy computation uses 64-bit fixed point.
 
 use fixed::types::{U0F32, U32F32};
 
-/// Energía restante de un píxel. Rango `[0, 1)`.
+/// Remaining energy of a pixel. Range `[0, 1)`.
 pub type Frac = U0F32;
 
-/// Acumulador de energía: 32 bits enteros y 32 fraccionarios.
+/// Energy accumulator: 32 integer bits and 32 fractional bits.
 ///
-/// Permite sumar muchos `Frac` sin desbordar antes de dividir por el número
-/// de píxeles.
+/// Allows adding many `Frac` values without overflowing before dividing by the
+/// number of pixels.
 pub type Scalar = U32F32;
 
-/// Subpíxel de 8 bits a `Frac`, replicando el byte por todos los bits
-/// fraccionarios (0 a 0, 128 a ~0,502, 255 a ~1,0).
+/// 8-bit subpixel to `Frac`, replicating the byte across all fractional
+/// bits (0 to 0, 128 to ~0.502, 255 to ~1.0).
 pub(crate) fn frac_from_u8(value: u8) -> Frac {
     Frac::from_bits(u32::from(value) * 0x0101_0101)
 }
 
-/// `Frac` a `Scalar`, para poder acumular sin salir del rango.
+/// `Frac` to `Scalar`, so it can accumulate without leaving the range.
 pub(crate) fn scalar_from_frac(frac: Frac) -> Scalar {
     Scalar::from_bits(u64::from(frac.to_bits()))
 }

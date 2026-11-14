@@ -1,10 +1,10 @@
-# Flags del build web multihilo. Se cargan con `cargo +nightly web-threads`.
+# Multithreaded web build flags. Loaded with `cargo +nightly web-threads`.
 #
-# Sin `+atomics` el módulo no usa memoria compartida y `wasm_thread` no puede
-# arrancar workers. `+bulk-memory` y `+mutable-globals` completan lo que exige
-# instanciar el mismo módulo en varios workers compartiendo la memoria.
+# Without `+atomics` the module does not use shared memory and `wasm_thread` cannot
+# start workers. `+bulk-memory` and `+mutable-globals` complete what is required to
+# instantiate the same module in several workers sharing memory.
 #
-# Solo aplica al target wasm: el build nativo no se toca.
+# Only applies to the wasm target: the native build is untouched.
 [target.wasm32-unknown-unknown]
 rustflags = [
   "-C", "target-feature=+atomics,+bulk-memory,+mutable-globals",
@@ -17,8 +17,8 @@ rustflags = [
   "-C", "link-arg=--export=__tls_base",
 ]
 
-# Recompila std y el runtime de pánico desde fuente. El std precompilado de
-# wasm32 no trae soporte de atomics, así que sin esto los workers no arrancan.
-# Requiere el componente rust-src del toolchain nightly.
+# Rebuilds std and the panic runtime from source. The precompiled wasm32 std
+# has no atomics support, so without this the workers do not start.
+# Requires the rust-src component of the nightly toolchain.
 [unstable]
 build-std = ["std", "panic_abort"]

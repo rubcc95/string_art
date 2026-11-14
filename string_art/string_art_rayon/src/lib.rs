@@ -5,12 +5,12 @@ use rayon::iter::{
 };
 use string_art_sync::Executor;
 
-/// Pool de rayon propio, con un número de hilos fijo.
+/// Its own rayon pool, with a fixed number of threads.
 ///
-/// Tener el pool aquí (y no el global de rayon) permite elegir el número
-/// de hilos en runtime y medirlo sin tocar variables de entorno. Además el
-/// número de hilos queda fijado en el constructor, como exige [`Executor`]:
-/// de él dependen el troceado del tablero y el tamaño de los buffers.
+/// Having the pool here (and not rayon's global one) lets you choose the number
+/// of threads at runtime and measure it without touching environment variables.
+/// Besides, the number of threads is fixed in the constructor, as [`Executor`]
+/// requires: board chunking and buffer sizes depend on it.
 #[derive(Clone)]
 pub struct RayonExec {
     pool: Arc<rayon::ThreadPool>,
@@ -18,23 +18,23 @@ pub struct RayonExec {
 }
 
 impl RayonExec {
-    /// Pool de `threads` hilos. `0` se trata como `1`.
+    /// Pool with `threads` threads. `0` is treated as `1`.
     pub fn new(threads: usize) -> Self {
         let threads = threads.max(1);
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(threads)
             .build()
-            .expect("no se pudo crear el pool de rayon");
+            .expect("could not create the rayon pool");
         Self {
             pool: Arc::new(pool),
             threads,
         }
     }
 
-    /// Un hilo por CPU disponible.
+    /// One thread per available CPU.
     ///
-    /// Mismo criterio que el pool por defecto de rayon, pero sin pasar por
-    /// `RAYON_NUM_THREADS` ni tocar el pool global.
+    /// Same criterion as rayon's default pool, but without going through
+    /// `RAYON_NUM_THREADS` or touching the global pool.
     pub fn auto() -> Self {
         let threads = std::thread::available_parallelism()
             .map(|threads| threads.get())

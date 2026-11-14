@@ -5,9 +5,9 @@ edition = "2024"
 
 [features]
 default = ["multithreaded"]
-# Hilos reales: `GpuiExec` y el pool multihilo de gpui_web (que necesita
-# nightly + `build-std` + una página con COOP/COEP). Sin esta feature la app
-# compila en estable y usa `Serial`.
+# Real threads: `GpuiExec` and the gpui_web multithreaded pool (which needs
+# nightly + `build-std` + a page with COOP/COEP). Without this feature the app
+# compiles on stable and uses `Serial`.
 multithreaded = [
     "gpui_platform/multithreaded",
     "string_art/multithreaded",
@@ -20,9 +20,9 @@ string_art_sync = { workspace = true }
 string_art_serial = { workspace = true }
 image = { workspace = true }
 web-time = "1.1"
-# Zed consume gpui con `default-features = false`: las features de plataforma
-# las activa `gpui_platform` según el target. Sus defaults aquí no aportan nada
-# y en wasm arrastran `windows-manifest`/`embed-resource` al build del host.
+# Zed consumes gpui with `default-features = false`: platform features
+# are enabled by `gpui_platform` depending on the target. Its defaults here add nothing
+# and on wasm they drag `windows-manifest`/`embed-resource` into the host build.
 gpui = { git = "https://github.com/zed-industries/zed", default-features = false }
 gpui_platform = { git = "https://github.com/zed-industries/zed", default-features = false }
 
@@ -31,12 +31,12 @@ gpui_platform = { git = "https://github.com/zed-industries/zed", default-feature
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 wasm-bindgen = "0.2"
-# Misma rev que usa gpui_web para no duplicar el crate. `num_cpus::get()`
-# devuelve siempre 1 en wasm32; `wasm_thread::available_parallelism()` lee
+# Same rev that gpui_web uses to avoid duplicating the crate. `num_cpus::get()`
+# always returns 1 on wasm32; `wasm_thread::available_parallelism()` reads
 # `navigator.hardwareConcurrency`.
 wasm_thread = { git = "https://github.com/zed-industries/wasm_thread", rev = "0cf96c7708dfb97ccf3da50347e25edcf75d6937", features = ["es_modules"], optional = true }
 
 [dev-dependencies]
-# `ThreadedDispatcher` (feature `bench-support`): pool multihilo sin ventana,
-# para medir `GpuiExec` de forma repetible con `cargo test --release`.
+# `ThreadedDispatcher` (feature `bench-support`): multithreaded pool without a window,
+# to measure `GpuiExec` repeatably with `cargo test --release`.
 gpui = { git = "https://github.com/zed-industries/zed", default-features = false, features = ["bench-support"] }

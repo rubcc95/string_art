@@ -4,13 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-# Sin hilos por defecto: el core es monohilo salvo que alguien pida un backend
-# paralelo (rayon, o `string_art_gpui`).
+# No threads by default: the core is single-threaded unless someone requests a
+# parallel backend (rayon, or `string_art_gpui`).
 default = []
-# Backends que cruzan hilos de verdad (rayon nativo, hilos de wasm).
+# Backends that actually cross threads (native rayon, wasm threads).
 #
-# Con esto apagado `CondSend`/`CondSync` son vacíos: nada sale de su hilo, así
-# que un `Anchor` con `Rc` dentro es perfectamente válido. Con esto encendido
-# vuelven a ser `Send`/`Sync` reales, que es lo que exige el backend al repartir
-# trabajo.
+# With this off, `CondSend`/`CondSync` are empty: nothing leaves its thread, so
+# an `Anchor` with an `Rc` inside is perfectly valid. With this on
+# they are `Send`/`Sync` again, which is what the backend requires when distributing
+# work.
 multithreaded = []

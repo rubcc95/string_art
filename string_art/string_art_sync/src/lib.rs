@@ -1,69 +1,69 @@
-//! Reparto del trabajo del cálculo entre hilos.
+//! Distribution of the computation work across threads.
 //!
-//! El core no sabe nada de hilos, de wasm ni de interfaces: solo pide un
-//! backend que implemente [`Parallel`].
+//! The core knows nothing about threads, wasm, or interfaces: it only asks
+//! for a backend that implements [`Parallel`].
 //!
-//! # Implementaciones
+//! # Implementations
 //!
-//! - [`Serial`]: un solo hilo. Siempre disponible.
-//! - [`RayonExec`]: pool de rayon. Nativo y, con `wasm-bindgen-rayon`, web.
-//! - `string_art_gpui::GpuiExec`: pool multihilo de gpui (web).
+//! - [`Serial`]: a single thread. Always available.
+//! - [`RayonExec`]: rayon pool. Native and, with `wasm-bindgen-rayon`, web.
+//! - `string_art_gpui::GpuiExec`: gpui multithreaded pool (web).
 //!
-//! # Dos formas de repartir
+//! # Two ways to distribute
 //!
-//! [`Parallel::for_each`] es bloqueante: cuando vuelve, el trabajo está hecho.
-//! Es la forma barata y la que usa el core.
+//! [`Parallel::for_each`] is blocking: when it returns, the work is done.
+//! It is the cheap form and the one the core uses.
 //!
-//! [`Parallel::map`] devuelve un future. Existe porque algunos backends no
-//! pueden bloquear (el hilo principal de un navegador no puede esperar), y su
-//! implementación por defecto reutiliza `for_each`, así que solo hay que
-//! reescribirla si el backend lo necesita.
+//! [`Parallel::map`] returns a future. It exists because some backends cannot
+//! block (the main thread of a browser cannot wait), and its default
+//! implementation reuses `for_each`, so it only has to be overridden if the
+//! backend needs it.
 
-/// `Send` condicional.
+/// Conditional `Send`.
 ///
-/// Con la feature `threads` encendida es `Send` de verdad: hay backends que
-/// reparten el trabajo entre hilos y el tipo tiene que poder cruzar. Apagada no
-/// hay ningún backend que cruce hilos, así que vale cualquier tipo —`Rc`
-/// incluido— y el trait queda vacío.
+/// With the `threads` feature enabled it is `Send` for real: some backends
+/// distribute the work across threads and the type has to be able to cross.
+/// When disabled, there is no backend that crosses threads, so any type works
+/// —`Rc` included— and the trait is left empty.
 ///
-/// La condición es **qué backends entran en el build**, no la arquitectura: en
-/// wasm con `gpui_web` sí hay hilos, así que atarla a `target_arch = wasm32`
-/// (como se hacía antes) dejaba cruzar hilos con tipos que no lo son.
+/// The condition is **which backends are in the build**, not the architecture:
+/// in wasm with `gpui_web` there are threads, so tying it to `target_arch = wasm32`
+/// (as was done before) allowed crossing threads with types that are not.
 #[cfg(feature = "multithreaded")]
 pub trait CondSend: Send {}
 #[cfg(feature = "multithreaded")]
 impl<T: Send + ?Sized> CondSend for T {}
 
-/// Ver [`CondSend`].
+/// See [`CondSend`].
 #[cfg(not(feature = "multithreaded"))]
 pub trait CondSend {}
 #[cfg(not(feature = "multithreaded"))]
 impl<T: ?Sized> CondSend for T {}
 
-/// `Sync` condicional. Misma regla que [`CondSend`].
+/// Conditional `Sync`. Same rule as [`CondSend`].
 #[cfg(feature = "multithreaded")]
 pub trait CondSync: Sync {}
 #[cfg(feature = "multithreaded")]
 impl<T: Sync + ?Sized> CondSync for T {}
 
-/// Ver [`CondSync`].
+/// See [`CondSync`].
 #[cfg(not(feature = "multithreaded"))]
 pub trait CondSync {}
 #[cfg(not(feature = "multithreaded"))]
 impl<T: ?Sized> CondSync for T {}
 
-/// Reparto del trabajo entre hilos.
+/// Distribution of work across threads.
 pub trait Executor {
-    /// Hilos que este backend pone a disposición.
+    /// Threads that this backend makes available.
     ///
-    /// Se usa para trocear el tablero y para dimensionar los buffers, así que
-    /// debe ser estable durante toda la vida del backend.
+    /// It is used to chunk the board and to size the buffers, so it must be
+    /// stable for the whole lifetime of the backend.
     fn workers(&self) -> usize;
 
-    /// Ejecuta `f(i, elemento)` sobre cada elemento de `bufs`.
+    /// Runs `f(i, element)` on each element of `bufs`.
     ///
-    /// Puede bloquear: solo es válido llamarlo desde un hilo que pueda
-    /// bloquearse. Nunca desde el hilo principal de un navegador.
+    /// It may block: it is only valid to call it from a thread that can
+    /// block. Never from the main thread of a browser.
     #[cfg(not(feature = "multithreaded"))]
     fn for_each<T, F>(&self, bufs: &mut [T], f: F)
     where

@@ -1,6 +1,6 @@
 /target
 
-# Salidas de build de wasm (no versionar binarios grandes)
+# Wasm build outputs (do not commit large binaries)
 *.wasm
 !string_art_gui/assets/pkg/*.wasm
 !string_art_gui/web/pkg/*.wasm

@@ -1,11 +1,11 @@
-# Atajos de build web.
+# Web build shortcuts.
 #
-# `cargo web` compila en estable y sin hilos: sin SharedArrayBuffer, sin
-# workers y con un wasm más pequeño. La app usa Serial.
+# `cargo web` builds on stable and without threads: no SharedArrayBuffer, no
+# workers, and a smaller wasm. The app uses Serial.
 #
-# `cargo +nightly web-threads` compila con hilos reales. Necesita nightly +
-# rust-src porque hay que recompilar la std de wasm con atomics (ver
-# web-threads.toml), y la página tiene que servirse con COOP/COEP.
+# `cargo +nightly web-threads` builds with real threads. It needs nightly +
+# rust-src because the wasm std has to be rebuilt with atomics (see
+# web-threads.toml), and the page has to be served with COOP/COEP.
 [alias]
 web = "build -p string_art_gpui --target wasm32-unknown-unknown --no-default-features"
 web-threads = "build -p string_art_gpui --target wasm32-unknown-unknown --config .cargo/web-threads.toml"
