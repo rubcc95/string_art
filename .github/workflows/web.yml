@@ -123,8 +123,8 @@ jobs:
           cd site
           git init -q
           git checkout -q -b "$BRANCH"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "Rubén Cantón Casado"
+          git config user.email "rubcc95@gmail.com"
           git add -A
           git commit -q --allow-empty -m "Web build ${GITHUB_SHA}"
           git push --force \
