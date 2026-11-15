@@ -1,5 +1,6 @@
 use string_art::{
     Computation, ComputationExecutor, Decay, Ellipse, Frac, Monocolor,
+    board::IntoBoard,
     geometry::Rect,
     nails::{Anchor, Circular, circular::Direction},
 };
@@ -8,6 +9,8 @@ const SIZE: u32 = 1024;
 const NAILS: usize = 512;
 const MIN_DISTANCE: usize = 20;
 const STEPS: u32 = 3000;
+
+type BenchBoard = <Ellipse<Circular> as IntoBoard>::Board;
 
 fn test_image(size: u32) -> image::RgbImage {
     let center = size as f32 / 2.0;
@@ -21,7 +24,7 @@ fn test_image(size: u32) -> image::RgbImage {
 
 /// Same as [`run`], but returns the time of the computation phase (the
 /// [`STEPS`] steps), not counting image, map, and board preparation.
-pub fn run_timed<X: ComputationExecutor<Ellipse<Circular>, Monocolor<Anchor<Direction>>>>(par: X) -> f64 {
+pub fn run_timed<X: ComputationExecutor<BenchBoard, Monocolor<Anchor<Direction>>>>(par: X) -> f64 {
     let image = test_image(SIZE);
     let monocolor: Monocolor<Anchor<Direction>> = Monocolor::from_image(&image, STEPS);
     let board = Ellipse::new(
