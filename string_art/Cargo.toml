@@ -23,6 +23,3 @@ serde = { workspace = true, optional = true }
 default = ["image"]
 image = ["dep:image", "string_art_color/image"]
 serde = ["dep:serde", "string_art_geometry/serde", "fixed/serde"]
-# Real threads. Without this, the computation is single-threaded and `Anchor`
-# does not have to be `Send`/`Sync`. Enabled by anyone using a parallel backend (rayon, gpui).
-multithreaded = ["string_art_sync/multithreaded"]

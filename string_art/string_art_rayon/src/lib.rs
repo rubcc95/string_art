@@ -3,14 +3,9 @@ use std::sync::Arc;
 use rayon::iter::{
     IndexedParallelIterator as _, IntoParallelRefMutIterator as _, ParallelIterator as _,
 };
-use string_art_sync::Executor;
+use string_art_sync::{Executor, Work, Workers};
 
 /// Its own rayon pool, with a fixed number of threads.
-///
-/// Having the pool here (and not rayon's global one) lets you choose the number
-/// of threads at runtime and measure it without touching environment variables.
-/// Besides, the number of threads is fixed in the constructor, as [`Executor`]
-/// requires: board chunking and buffer sizes depend on it.
 #[derive(Clone)]
 pub struct RayonExec {
     pool: Arc<rayon::ThreadPool>,
@@ -25,16 +20,10 @@ impl RayonExec {
             .num_threads(threads)
             .build()
             .expect("could not create the rayon pool");
-        Self {
-            pool: Arc::new(pool),
-            threads,
-        }
+        Self { pool: Arc::new(pool), threads }
     }
 
     /// One thread per available CPU.
-    ///
-    /// Same criterion as rayon's default pool, but without going through
-    /// `RAYON_NUM_THREADS` or touching the global pool.
     pub fn auto() -> Self {
         let threads = std::thread::available_parallelism()
             .map(|threads| threads.get())
@@ -44,25 +33,23 @@ impl RayonExec {
 }
 
 impl Default for RayonExec {
-    fn default() -> Self {
-        Self::auto()
-    }
+    fn default() -> Self { Self::auto() }
 }
 
-impl Executor for RayonExec {
-    fn workers(&self) -> usize {
-        self.threads
-    }
+impl Workers for RayonExec {
+    fn workers(&self) -> usize { self.threads }
+}
 
-    fn for_each<T, F>(&self, bufs: &mut [T], f: F)
-    where
-        T: Send,
-        F: Fn(usize, &mut T) + Send + Sync,
-    {
+impl<T, W> Executor<T, W> for RayonExec
+where
+    T: Send,
+    W: Work<T> + Send + Sync,
+{
+    fn for_each(&self, buffers: &mut [T], work: W) {
         self.pool.install(|| {
-            bufs.par_iter_mut()
+            buffers.par_iter_mut()
                 .enumerate()
-                .for_each(|(index, buf)| f(index, buf));
+                .for_each(|(index, buffer)| work.run(index, buffer));
         });
     }
 }

@@ -1,76 +1,29 @@
-//! Distribution of the computation work across threads.
-//!
-//! The core knows nothing about threads, wasm, or interfaces: it only asks
-//! for a backend that implements [`Parallel`].
-//!
-//! # Implementations
-//!
-//! - [`Serial`]: a single thread. Always available.
-//! - [`RayonExec`]: rayon pool. Native and, with `wasm-bindgen-rayon`, web.
-//! - `string_art_gpui::GpuiExec`: gpui multithreaded pool (web).
-//!
-//! # Two ways to distribute
-//!
-//! [`Parallel::for_each`] is blocking: when it returns, the work is done.
-//! It is the cheap form and the one the core uses.
-//!
-//! [`Parallel::map`] returns a future. It exists because some backends cannot
-//! block (the main thread of a browser cannot wait), and its default
-//! implementation reuses `for_each`, so it only has to be overridden if the
-//! backend needs it.
+//! Execution primitives shared by the computation core and its backends.
 
-/// Conditional `Send`.
-///
-/// With the `threads` feature enabled it is `Send` for real: some backends
-/// distribute the work across threads and the type has to be able to cross.
-/// When disabled, there is no backend that crosses threads, so any type works
-/// —`Rc` included— and the trait is left empty.
-///
-/// The condition is **which backends are in the build**, not the architecture:
-/// in wasm with `gpui_web` there are threads, so tying it to `target_arch = wasm32`
-/// (as was done before) allowed crossing threads with types that are not.
-#[cfg(feature = "multithreaded")]
-pub trait CondSend: Send {}
-#[cfg(feature = "multithreaded")]
-impl<T: Send + ?Sized> CondSend for T {}
+/// A unit of work that can be run against one mutable buffer.
+pub trait Work<T> {
+    fn run(&self, index: usize, buffer: &mut T);
+}
 
-/// See [`CondSend`].
-#[cfg(not(feature = "multithreaded"))]
-pub trait CondSend {}
-#[cfg(not(feature = "multithreaded"))]
-impl<T: ?Sized> CondSend for T {}
+impl<T, F> Work<T> for F
+where
+    F: Fn(usize, &mut T),
+{
+    #[inline]
+    fn run(&self, index: usize, buffer: &mut T) {
+        self(index, buffer);
+    }
+}
 
-/// Conditional `Sync`. Same rule as [`CondSend`].
-#[cfg(feature = "multithreaded")]
-pub trait CondSync: Sync {}
-#[cfg(feature = "multithreaded")]
-impl<T: Sync + ?Sized> CondSync for T {}
-
-/// See [`CondSync`].
-#[cfg(not(feature = "multithreaded"))]
-pub trait CondSync {}
-#[cfg(not(feature = "multithreaded"))]
-impl<T: ?Sized> CondSync for T {}
-
-/// Distribution of work across threads.
-pub trait Executor {
-    /// Threads that this backend makes available.
-    ///
-    /// It is used to chunk the board and to size the buffers, so it must be
-    /// stable for the whole lifetime of the backend.
+/// Number of stable worker slots provided by an execution backend.
+pub trait Workers {
     fn workers(&self) -> usize;
+}
 
-    /// Runs `f(i, element)` on each element of `bufs`.
-    ///
-    /// It may block: it is only valid to call it from a thread that can
-    /// block. Never from the main thread of a browser.
-    #[cfg(not(feature = "multithreaded"))]
-    fn for_each<T, F>(&self, bufs: &mut [T], f: F)
-    where
-        F: Fn(usize, &mut T);
-    #[cfg(feature = "multithreaded")]
-    fn for_each<T, F>(&self, bufs: &mut [T], f: F)
-    where
-        T: Send,
-        F: Fn(usize, &mut T) + Send + Sync;
+/// Executes typed work over independent mutable buffers.
+///
+/// The bounds required to cross threads belong to each backend implementation,
+/// not to the core or to this trait.
+pub trait Executor<T, W: Work<T>> {
+    fn for_each(&self, buffers: &mut [T], work: W);
 }

@@ -2,15 +2,3 @@
 name = "string_art_sync"
 version = "0.1.0"
 edition = "2024"
-
-[features]
-# No threads by default: the core is single-threaded unless someone requests a
-# parallel backend (rayon, or `string_art_gpui`).
-default = []
-# Backends that actually cross threads (native rayon, wasm threads).
-#
-# With this off, `CondSend`/`CondSync` are empty: nothing leaves its thread, so
-# an `Anchor` with an `Rc` inside is perfectly valid. With this on
-# they are `Send`/`Sync` again, which is what the backend requires when distributing
-# work.
-multithreaded = []

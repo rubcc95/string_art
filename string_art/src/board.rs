@@ -1,5 +1,4 @@
 use derive_more::Deref;
-use string_art_sync::CondSync;
 
 type Seg = crate::geometry::Segment<f32>;
 
@@ -9,10 +8,7 @@ pub trait IntoBoard {
     fn into_board(self, cpus: usize) -> Self::Board;
 }
 
-pub trait Board: CondSync {
-    #[cfg(feature = "multithreaded")]
-    type Anchor: Clone + Default + Send + Sync;
-    #[cfg(not(feature = "multithreaded"))]
+pub trait Board {
     type Anchor: Clone + Default;
 
     fn batch<'a>(
@@ -30,9 +26,7 @@ pub trait SegmentRef {
     type Anchor;
 
     fn segment(&self) -> &Segment;
-
     fn index(&self) -> usize;
-
     fn anchor(&self) -> Self::Anchor;
 }
 
@@ -45,28 +39,17 @@ pub struct Segment {
 
 impl From<Seg> for Segment {
     fn from(segment: Seg) -> Self {
-        Self {
-            segment,
-            is_used: false,
-        }
+        Self { segment, is_used: false }
     }
 }
 
 impl Segment {
     pub fn new(segment: Seg) -> Self {
-        Self {
-            segment,
-            is_used: false,
-        }
+        Self { segment, is_used: false }
     }
 
-    pub fn get_segment(&self) -> &Seg {
-        &self.segment
-    }
-
-    pub fn is_used(&self) -> bool {
-        self.is_used
-    }
+    pub fn get_segment(&self) -> &Seg { &self.segment }
+    pub fn is_used(&self) -> bool { self.is_used }
 
     pub fn set_used(&mut self) {
         debug_assert_eq!(self.is_used, false);

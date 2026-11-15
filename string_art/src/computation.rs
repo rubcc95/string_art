@@ -4,6 +4,7 @@ use crate::num::{Frac, Scalar, scalar_from_frac};
 use crate::*;
 use board::*;
 use geometry::Rect;
+use string_art_sync::{Executor, Work, Workers};
 
 pub struct ColorMap<A, C> {
     pub anchor: A,
@@ -12,23 +13,89 @@ pub struct ColorMap<A, C> {
 }
 
 pub trait Pipeline: Iterator<Item = Self::Index> {
-    #[cfg(feature = "multithreaded")]
-    type Anchor: Send + Sync + Clone;
-    #[cfg(not(feature = "multithreaded"))]
     type Anchor: Clone;
     type Color: Clone;
     type Index: Clone + Into<usize>;
 
     fn color_map(&self, index: &Self::Index) -> &ColorMap<Self::Anchor, Self::Color>;
-
     fn color_map_mut(&mut self, index: &Self::Index) -> &mut ColorMap<Self::Anchor, Self::Color>;
-
     fn color_maps(&self) -> &[ColorMap<Self::Anchor, Self::Color>];
-
     fn color_maps_mut(&mut self) -> &mut [ColorMap<Self::Anchor, Self::Color>];
 }
 
-pub struct Computation<B, P: Pipeline, X: Executor> {
+#[doc(hidden)]
+pub type WorkBuffer<P> = Option<NextLineWeighted<<P as Pipeline>::Anchor>>;
+
+/// The concrete computation task passed to an execution backend.
+#[doc(hidden)]
+pub struct ComputationWork<'a, B, P: Pipeline> {
+    board: &'a B,
+    rect: &'a Rect<usize>,
+    anchor: &'a P::Anchor,
+    weights: &'a [Frac],
+}
+
+impl<'a, B, P> Work<WorkBuffer<P>> for ComputationWork<'a, B, P>
+where
+    B: Board,
+    P: Pipeline<Anchor = B::Anchor>,
+{
+    fn run(&self, i: usize, next_line: &mut WorkBuffer<P>) {
+        *next_line = None;
+        for segment in self.board.batch(self.anchor, i) {
+            let board_segment = segment.segment();
+            if board_segment.is_used() {
+                continue;
+            }
+
+            let weight = {
+                let mut count = 0u32;
+                let mut weight = Scalar::ZERO;
+                for idx in self.rect.get_pixel_indexes_in_segment(board_segment) {
+                    weight += scalar_from_frac(self.weights[idx]);
+                    count += 1;
+                }
+                if count > 0 { weight / Scalar::from_num(count) } else { Scalar::ZERO }
+            };
+
+            let better = match next_line {
+                Some(current) => (weight, segment.index()) > (current.weight, current.next.segment_idx),
+                None => true,
+            };
+            if better {
+                *next_line = Some(NextLineWeighted {
+                    weight,
+                    next: NextLine {
+                        segment_idx: segment.index(),
+                        anchor: segment.anchor(),
+                    },
+                });
+            }
+        }
+    }
+}
+
+/// Adapter exposing the backend selected for a particular computation.
+pub trait ComputationExecutor<B: Board, P: Pipeline<Anchor = B::Anchor>> {
+    fn workers(&self) -> usize;
+    fn for_each(&self, bufs: &mut [WorkBuffer<P>], work: ComputationWork<'_, B, P>);
+}
+
+impl<B, P, X> ComputationExecutor<B, P> for X
+where
+    B: Board,
+    P: Pipeline<Anchor = B::Anchor>,
+    X: Workers,
+    for<'a> X: Executor<WorkBuffer<P>, ComputationWork<'a, B, P>>,
+{
+    fn workers(&self) -> usize { Workers::workers(self) }
+
+    fn for_each(&self, bufs: &mut [WorkBuffer<P>], work: ComputationWork<'_, B, P>) {
+        Executor::for_each(self, bufs, work);
+    }
+}
+
+pub struct Computation<B, P: Pipeline, X> {
     pipeline: P,
     inner: Inner<B, P, X>,
 }
@@ -37,31 +104,18 @@ pub struct Computation<B, P: Pipeline, X: Executor> {
 #[error("The length of the color map buffer does not match the length of the rectangle area.")]
 pub struct RectAreaError;
 
-impl<'a, B, P: Pipeline, X: Executor> Computation<B, P, X> {
-    pub fn board(&self) -> &B {
-        &self.inner.board
-    }
-
-    pub fn rect(&self) -> &Rect<usize> {
-        &self.inner.rect
-    }
-
-    pub fn pipeline(&self) -> &P {
-        &self.pipeline
-    }
-
-    /// The parallelism backend it was created with.
-    pub fn par(&self) -> &X {
-        &self.inner.par
-    }
-}
-
-impl<'a, B, P, X> Computation<B, P, X>
+impl<B, P, X> Computation<B, P, X>
 where
     B: Board,
     P: Pipeline<Anchor = B::Anchor>,
-    X: Executor,
+    X: ComputationExecutor<B, P>,
 {
+    pub fn board(&self) -> &B { &self.inner.board }
+    pub fn rect(&self) -> &Rect<usize> { &self.inner.rect }
+    pub fn pipeline(&self) -> &P { &self.pipeline }
+    /// The execution backend it was created with.
+    pub fn par(&self) -> &X { &self.inner.par }
+
     pub fn new<T: IntoBoard<Board = B>>(
         par: X,
         pipeline: P,
@@ -75,7 +129,7 @@ where
             inner: Inner {
                 par,
                 board: into_board.into_board(workers),
-                rect: rect,
+                rect,
                 bufs: vec![None; workers],
                 decay,
             },
@@ -93,11 +147,11 @@ where
     }
 }
 
-impl<'a, B, P, X> Iterator for Computation<B, P, X>
+impl<B, P, X> Iterator for Computation<B, P, X>
 where
     B: Board,
     P: Pipeline<Anchor = B::Anchor>,
-    X: Executor,
+    X: ComputationExecutor<B, P>,
 {
     type Item = Result<Step<P>, StepError>;
 
@@ -111,126 +165,64 @@ where
                 };
                 segment.set_used();
                 let anchor = core::mem::replace(&mut map.anchor, line.anchor);
-                for point in self
-                    .inner
-                    .rect
-                    .get_pixel_indexes_in_segment(segment.get_segment())
-                {
+                for point in self.inner.rect.get_pixel_indexes_in_segment(segment.get_segment()) {
                     let weight = &mut map.weights[point];
                     *weight = self.inner.decay.compute(*weight);
                 }
-
-                Ok(Step {
-                    color: index,
-                    anchor,
-                    segment: *segment.get_segment(),
-                })
+                Ok(Step { color: index, anchor, segment: *segment.get_segment() })
             })
         })
     }
 
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.pipeline.size_hint()
-    }
+    fn size_hint(&self) -> (usize, Option<usize>) { self.pipeline.size_hint() }
 }
 
-impl<'a, B, P, X> ExactSizeIterator for Computation<B, P, X>
+impl<B, P, X> ExactSizeIterator for Computation<B, P, X>
 where
     B: Board,
     P: Pipeline<Anchor = B::Anchor> + ExactSizeIterator,
-    X: Executor,
+    X: ComputationExecutor<B, P>,
 {
-    fn len(&self) -> usize {
-        self.pipeline.len()
-    }
+    fn len(&self) -> usize { self.pipeline.len() }
 }
 
-impl<'a, B, P, X> FusedIterator for Computation<B, P, X>
+impl<B, P, X> FusedIterator for Computation<B, P, X>
 where
     B: Board,
     P: Pipeline<Anchor = B::Anchor> + FusedIterator,
-    X: Executor,
-{
-}
+    X: ComputationExecutor<B, P>,
+{}
 
 #[derive(Debug, thiserror::Error)]
 #[error("Computation error")]
 pub struct StepError;
 
-struct Inner<B, P: Pipeline, X: Executor> {
+struct Inner<B, P: Pipeline, X> {
     par: X,
     board: B,
     decay: decay::Decay,
     rect: Rect<usize>,
-    bufs: Vec<Option<NextLineWeighted<P::Anchor>>>,
+    bufs: Vec<WorkBuffer<P>>,
 }
 
-impl<'a, B, P, X> Inner<B, P, X>
+impl<B, P, X> Inner<B, P, X>
 where
     B: Board,
     P: Pipeline<Anchor = B::Anchor>,
-    X: Executor,
+    X: ComputationExecutor<B, P>,
 {
-    fn get_best_line(
-        &mut self,
-        map: &mut ColorMap<P::Anchor, P::Color>,
-    ) -> Option<NextLine<B::Anchor>> {
-        let Self {
-            par,
-            board,
-            rect,
-            bufs,
-            ..
-        } = self;
-
-        par.for_each(bufs, |i, next_line| {
-            *next_line = None;
-            for segment in board.batch(&map.anchor, i) {
-                let board_segment = segment.segment();
-
-                if board_segment.is_used() {
-                    continue;
-                }
-
-                let weight = {
-                    let mut count = 0u32;
-                    let mut weight = Scalar::ZERO;
-                    for idx in rect.get_pixel_indexes_in_segment(board_segment) {
-                        weight += scalar_from_frac(map.weights[idx]);
-                        count += 1;
-                    }
-                    if count > 0 {
-                        weight / Scalar::from_num(count)
-                    } else {
-                        Scalar::ZERO
-                    }
-                };
-
-                // Tie-break by segment index: this way the result does not depend
-                // on how the candidates are distributed among threads.
-                let better = match next_line {
-                    Some(current) => {
-                        (weight, segment.index()) > (current.weight, current.next.segment_idx)
-                    }
-                    None => true,
-                };
-
-                if better {
-                    *next_line = Some(NextLineWeighted {
-                        weight,
-                        next: NextLine {
-                            segment_idx: segment.index(),
-                            anchor: segment.anchor(),
-                        },
-                    })
-                }
-            }
-        });
-
-        bufs.iter_mut()
-            .filter_map(|a| a.take())
+    fn get_best_line(&mut self, map: &mut ColorMap<P::Anchor, P::Color>) -> Option<NextLine<B::Anchor>> {
+        let work = ComputationWork {
+            board: &self.board,
+            rect: &self.rect,
+            anchor: &map.anchor,
+            weights: &map.weights,
+        };
+        self.par.for_each(&mut self.bufs, work);
+        self.bufs.iter_mut()
+            .filter_map(|item| item.take())
             .max_by(|a, b| (a.weight, a.next.segment_idx).cmp(&(b.weight, b.next.segment_idx)))
-            .map(|a| a.next)
+            .map(|item| item.next)
     }
 }
 
@@ -250,16 +242,14 @@ struct NextLine<A> {
 
 #[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-struct NextLineWeighted<A> {
+#[doc(hidden)]
+pub struct NextLineWeighted<A> {
     next: NextLine<A>,
     weight: Scalar,
 }
 
 impl<A: Default> Default for NextLineWeighted<A> {
     fn default() -> Self {
-        Self {
-            next: Default::default(),
-            weight: Scalar::ZERO,
-        }
+        Self { next: Default::default(), weight: Scalar::ZERO }
     }
 }

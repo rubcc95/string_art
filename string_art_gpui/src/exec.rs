@@ -6,7 +6,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
     },
 };
-use string_art::Executor;
+use string_art_sync::{Executor, Work, Workers};
 
 /// [`Parallel`] backend on top of the gpui background pool.
 ///
@@ -44,22 +44,16 @@ impl GpuiExec {
     }
 }
 
-impl Executor for GpuiExec {
-    /// Computation threads. One per CPU on native; on wasm one more is left free
-    /// for the thread serving the page.
-    ///
-    /// The caller of `for_each` occupies a pool thread while it waits, so
-    /// it has to be discounted when distributing. It is computed once in [`Self::new`]
-    /// because the trait requires it to be stable.
-    fn workers(&self) -> usize {
-        self.workers
-    }
+impl Workers for GpuiExec {
+    fn workers(&self) -> usize { self.workers }
+}
 
-    fn for_each<T, F>(&self, bufs: &mut [T], f: F)
-    where
-        T: Send,
-        F: Fn(usize, &mut T) + Send + Sync,
-    {
+impl<T, W> Executor<T, W> for GpuiExec
+where
+    T: Send,
+    W: Work<T> + Send + Sync,
+{
+    fn for_each(&self, bufs: &mut [T], work: W) {
         /// Completion counter for a `for_each`.
         ///
         /// `done` counts the tasks as they finish and `waiter` is the thread that
@@ -142,7 +136,7 @@ impl Executor for GpuiExec {
              (cx.background_executor().spawn(..))"
         );
 
-        let workers = self.workers();
+        let workers = self.workers;
         assert_eq!(
             bufs.len(),
             workers,
@@ -152,7 +146,7 @@ impl Executor for GpuiExec {
         // No parallelism possible: inline.
         if workers == 1 {
             for (index, buf) in bufs.iter_mut().enumerate() {
-                f(index, buf);
+                work.run(index, buf);
             }
             return;
         }
@@ -164,7 +158,7 @@ impl Executor for GpuiExec {
             remaining: Cell::new(bufs.len()),
         };
 
-        let f_addr = &f as *const F as usize;
+        let work_addr = &work as *const W as usize;
 
         for (index, buf) in bufs.iter_mut().enumerate() {
             let ptr = buf as *mut T as usize;
@@ -180,7 +174,7 @@ impl Executor for GpuiExec {
                 //   discarded before it gets to poll. Any task that is never even attempted
                 //   is not counted because its counter is not subtracted from `remaining`.
                 // - Each `ptr` comes from a different `iter_mut`, so there are no
-                //   two tasks with the same `&mut T`, and `&f` is only read.
+                //   two tasks with the same `&mut T`, and `&work` is only read.
                 // - The `Acquire` of `wait` pairs with the `AcqRel` of
                 //   `signal`: seeing `done == total` publishes the writes of
                 //   each task in its buffer, avoiding data races.
@@ -189,10 +183,10 @@ impl Executor for GpuiExec {
                 self.exec
                     .spawn(async move {
                         let _done = guard;
-                        let f = &*(f_addr as *const F);
+                        let work = &*(work_addr as *const W);
                         let buf = &mut *(ptr as *mut T);
 
-                        f(index, buf);
+                        work.run(index, buf);
                     })
                     .detach();
             }
@@ -210,7 +204,7 @@ mod tests {
     use std::sync::mpsc;
 
     use gpui::{BackgroundExecutor, ThreadedDispatcher};
-    use string_art::Executor;
+    use string_art_sync::{Executor, Workers};
 
     use super::GpuiExec;
 

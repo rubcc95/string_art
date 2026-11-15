@@ -1,47 +1,39 @@
-//! Without the `threads` feature no backend crosses threads, so `CondSend` and
-//! `CondSync` are empty: the single-threaded computation has to accept **any**
-//! type, `Rc` included.
-//!
-//! With `threads` enabled this file becomes empty: that same code stops
-//! compiling, which is exactly what should happen.
-
-#![cfg(not(feature = "multithreaded"))]
+//! The generic serial executor contract permits local, non-Send work.
 
 use std::rc::Rc;
+use string_art_sync::{Executor, Work};
 
-use string_art_sync::{CondSend, CondSync, Executor, Serial};
+struct Serial;
 
-fn assert_cond<T: CondSend + CondSync>() {}
+impl<T, W: Work<T>> Executor<T, W> for Serial {
+    fn for_each(&self, buffers: &mut [T], work: W) {
+        if let Some(buffer) = buffers.first_mut() {
+            work.run(0, buffer);
+        }
+    }
+}
 
-#[test]
-fn any_type_is_cond_send_and_cond_sync_without_threads() {
-    assert_cond::<Rc<()>>();
-    assert_cond::<Vec<Rc<()>>>();
-    assert_cond::<*const u8>();
+struct RcWork(Rc<u8>);
+
+impl Work<Rc<u8>> for RcWork {
+    fn run(&self, _: usize, buffer: &mut Rc<u8>) {
+        *buffer = self.0.clone();
+    }
 }
 
 #[test]
-fn serial_accepts_a_buffer_that_is_not_send() {
-    let mut bufs: Vec<Option<Rc<u8>>> = vec![None, None];
-
-    Serial.for_each(&mut bufs, |index, slot| {
-        *slot = Some(Rc::new(index as u8));
-    });
-
-    assert_eq!(
-        bufs.iter().map(|b| *b.clone().unwrap()).collect::<Vec<_>>(),
-        vec![0, 1]
-    );
+fn serial_contract_accepts_non_send_buffers_and_work() {
+    let value = Rc::new(7);
+    let mut buffers = [Rc::new(0)];
+    Serial.for_each(&mut buffers, RcWork(value.clone()));
+    assert_eq!(*buffers[0], 7);
+    assert!(Rc::ptr_eq(&buffers[0], &value));
 }
 
 #[test]
-fn serial_accepts_a_closure_that_is_not_send() {
-    let shared = Rc::new(0u8);
-    let mut bufs = [0u8; 2];
-
-    Serial.for_each(&mut bufs, |index, slot| {
-        *slot = *shared + index as u8;
-    });
-
-    assert_eq!(bufs, [0, 1]);
+fn serial_contract_accepts_a_closure_capturing_rc() {
+    let shared = Rc::new(5u8);
+    let mut buffers = [0u8];
+    Serial.for_each(&mut buffers, |_, slot| *slot = *shared);
+    assert_eq!(buffers, [5]);
 }
