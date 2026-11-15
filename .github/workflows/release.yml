@@ -1,11 +1,12 @@
 # Native release builds for Windows, Linux and macOS.
 #
-# Manual only (Actions > "Release build" > Run workflow).
-# By default it just builds and uploads the archives as workflow artifacts.
-# Fill in `tag` to also create/update a GitHub release with them.
+# Builds on every commit to main, and can also be started manually.
 name: Release build
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       tag:
@@ -37,9 +38,6 @@ jobs:
             target: x86_64-pc-windows-msvc
             asset: string_art-windows-x86_64.zip
           - name: Linux x86_64
-            # 22.04 (glibc 2.35) keeps the binary usable on older distros.
-            # The image is deprecated by GitHub from September 2026, unsupported
-            # from April 2027; bump it (or build in a container) before then.
             os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             asset: string_art-linux-x86_64.tar.gz
@@ -52,7 +50,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # gpui (X11 + Wayland, Vulkan, fontconfig, xkbcommon, ...).
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
@@ -78,8 +75,6 @@ jobs:
       - name: Build (release)
         run: cargo build --release --locked --package string_art_gpui --target ${{ matrix.target }}
 
-      # Stripping an arm64 Mach-O invalidates its ad-hoc signature, so macOS
-      # is left untouched. On Linux it saves a large chunk of the binary.
       - name: Strip
         if: runner.os == 'Linux'
         run: strip "target/${{ matrix.target }}/release/string_art_gpui"

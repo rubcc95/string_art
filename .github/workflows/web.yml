@@ -1,18 +1,12 @@
 # Web build (wasm) published to a branch that GitHub Pages serves.
 #
-# Manual only (Actions > "Deploy web" > Run workflow).
-#
-# Two variants:
-#   - threads: true  (default) `cargo +nightly web`: atomics + shared memory, real
-#     workers. The module needs cross-origin isolation, and GitHub Pages cannot
-#     send COOP/COEP, so a tiny service worker (.github/web/coi-serviceworker.js)
-#     is added to the deployed site. The first visit reloads once to become
-#     isolated.
-#   - threads: false `cargo web-serial`: single-threaded, no SharedArrayBuffer,
-#     no service worker. Use it if the isolation workaround is not wanted.
+# Builds on every commit to main, and can also be started manually.
 name: Deploy web
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       branch:
@@ -53,8 +47,7 @@ jobs:
 
       - name: Install Rust
         run: |
-          if [ "${{ inputs.threads }}" = "true" ]; then
-            # build-std needs rust-src to rebuild the wasm std with atomics.
+          if [ "${{ inputs.threads || 'true' }}" = "true" ]; then
             rustup toolchain install nightly --profile minimal \
               --component rust-src --target wasm32-unknown-unknown
           else
@@ -66,9 +59,8 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
-          key: wasm-${{ inputs.threads }}-${{ inputs.profile }}
+          key: wasm-${{ inputs.threads || 'true' }}-${{ inputs.profile || 'release' }}
 
-      # The CLI and the `wasm-bindgen` crate must be exactly the same version.
       - name: Install wasm-bindgen-cli
         run: |
           VERSION=$(awk '/^name = "wasm-bindgen"$/ { getline; sub(/^version = "/, ""); sub(/"$/, ""); print; exit }' Cargo.lock)
@@ -78,8 +70,8 @@ jobs:
       - name: Build wasm
         shell: bash
         env:
-          THREADS: ${{ inputs.threads }}
-          PROFILE: ${{ inputs.profile }}
+          THREADS: ${{ inputs.threads || 'true' }}
+          PROFILE: ${{ inputs.profile || 'release' }}
         run: |
           set -euo pipefail
           flags=()
@@ -95,7 +87,7 @@ jobs:
       - name: Run wasm-bindgen
         shell: bash
         env:
-          PROFILE: ${{ inputs.profile }}
+          PROFILE: ${{ inputs.profile || 'release' }}
         run: |
           set -euo pipefail
           wasm-bindgen \
@@ -107,27 +99,21 @@ jobs:
       - name: Prepare site
         shell: bash
         env:
-          THREADS: ${{ inputs.threads }}
+          THREADS: ${{ inputs.threads || 'true' }}
         run: |
           set -euo pipefail
           web=string_art_gpui/web
           wasm="$web/string_art_gpui_bg.wasm"
-
-          # index.html uses this to size the download progress bar.
           size=$(stat -c %s "$wasm")
-          sed -i -E "s/(name=\"wasm-bytes\" content=\")[0-9]+(\")/\1${size}\2/" "$web/index.html"
-
+          sed -i -E "s/(name=\\"wasm-bytes\\" content=\\")[0-9]+(\\")/\\1${size}\\2/" "$web/index.html"
           rm -rf site
           mkdir -p site
           cp "$web/index.html" "$web/string_art_gpui.js" "$wasm" "$web"/*.d.ts site/
           touch site/.nojekyll
-
           if [ "$THREADS" = "true" ]; then
-            # GitHub Pages cannot set COOP/COEP; the worker synthesises them so
-            # SharedArrayBuffer (and therefore the wasm threads) is available.
             cp .github/web/coi-serviceworker.js site/
             grep -q "coi-serviceworker.js" site/index.html ||
-              sed -i 's#</head>#<script src="coi-serviceworker.js"></script>\n</head>#' site/index.html
+              sed -i 's#</head>#<script src="coi-serviceworker.js"></script>\\n</head>#' site/index.html
           fi
 
       - name: Publish to the Pages branch
@@ -158,7 +144,7 @@ jobs:
             echo "| Field | Value |"
             echo "| --- | --- |"
             echo "| Branch | \`${BRANCH}\` |"
-            echo "| Threads | \`${{ inputs.threads }}\` |"
-            echo "| Profile | \`${{ inputs.profile }}\` |"
+            echo "| Threads | \`${{ inputs.threads || 'true' }}\` |"
+            echo "| Profile | \`${{ inputs.profile || 'release' }}\` |"
             echo "| Commit | \`${GITHUB_SHA}\` |"
           } >> "$GITHUB_STEP_SUMMARY"
