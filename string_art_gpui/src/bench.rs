@@ -1,6 +1,7 @@
 use string_art::{
-    Computation, ComputationExecutor, Decay, Ellipse, Frac, Monocolor,
+    Computation, Decay, Ellipse, Frac, Monocolor,
     board::IntoBoard,
+    computation::ComputationExecutor,
     geometry::Rect,
     nails::{Anchor, Circular, circular::Direction},
 };
@@ -52,7 +53,7 @@ pub fn run_timed<X: ComputationExecutor<BenchBoard, Monocolor<Anchor<Direction>>
     start.elapsed().as_secs_f64() * 1000.0
 }
 
-pub fn run<X: ComputationExecutor<Ellipse<Circular>, Monocolor<Anchor<Direction>>>>(par: X) {
+pub fn run<X: ComputationExecutor<BenchBoard, Monocolor<Anchor<Direction>>>>(par: X) {
     let _ = run_timed(par);
 }
 

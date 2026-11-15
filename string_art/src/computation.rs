@@ -1,10 +1,9 @@
 use std::iter::FusedIterator;
 
-use crate::num::{Frac, Scalar, scalar_from_frac};
+use crate::num::Frac;
 use crate::*;
 use board::*;
 use geometry::Rect;
-use string_art_sync::{Executor, Work, Workers};
 
 pub struct ColorMap<A, C> {
     pub anchor: A,
@@ -23,75 +22,106 @@ pub trait Pipeline: Iterator<Item = Self::Index> {
     fn color_maps_mut(&mut self) -> &mut [ColorMap<Self::Anchor, Self::Color>];
 }
 
-#[doc(hidden)]
-pub type WorkBuffer<P> = Option<NextLineWeighted<<P as Pipeline>::Anchor>>;
-
-/// The concrete computation task passed to an execution backend.
-#[doc(hidden)]
-pub struct ComputationWork<'a, B, P: Pipeline> {
-    board: &'a B,
-    rect: &'a Rect<usize>,
-    anchor: &'a P::Anchor,
-    weights: &'a [Frac],
-}
-
-impl<'a, B, P> Work<WorkBuffer<P>> for ComputationWork<'a, B, P>
+pub trait ComputationExecutor<B, P>:
+    for<'a> Executor<WorkBuffer<P>, ComputationWork<'a, B, P>>
 where
     B: Board,
     P: Pipeline<Anchor = B::Anchor>,
 {
-    fn run(&self, i: usize, next_line: &mut WorkBuffer<P>) {
-        *next_line = None;
-        for segment in self.board.batch(self.anchor, i) {
-            let board_segment = segment.segment();
-            if board_segment.is_used() {
-                continue;
-            }
+}
 
-            let weight = {
-                let mut count = 0u32;
-                let mut weight = Scalar::ZERO;
-                for idx in self.rect.get_pixel_indexes_in_segment(board_segment) {
-                    weight += scalar_from_frac(self.weights[idx]);
-                    count += 1;
+impl<T, B, P> ComputationExecutor<B, P> for T
+where
+    T: for<'a> Executor<WorkBuffer<P>, ComputationWork<'a, B, P>>,
+    B: Board,
+    P: Pipeline<Anchor = B::Anchor>,
+{
+}
+use internal::*;
+mod internal {
+
+    use super::Pipeline;
+    use crate::{
+        Board, Frac, Scalar, Work, board::SegmentRef as _, geometry::Rect, scalar_from_frac,
+    };
+
+    pub struct ComputationWork<'a, B, P: Pipeline> {
+        pub board: &'a B,
+        pub rect: &'a Rect<usize>,
+        pub anchor: &'a P::Anchor,
+        pub weights: &'a [Frac],
+    }
+
+    impl<'a, B, P> Work<WorkBuffer<P>> for ComputationWork<'a, B, P>
+    where
+        B: Board,
+        P: Pipeline<Anchor = B::Anchor>,
+    {
+        fn run(&self, i: usize, next_line: &mut WorkBuffer<P>) {
+            *next_line = None;
+            for segment in self.board.batch(self.anchor, i) {
+                let board_segment = segment.segment();
+                if board_segment.is_used() {
+                    continue;
                 }
-                if count > 0 { weight / Scalar::from_num(count) } else { Scalar::ZERO }
-            };
 
-            let better = match next_line {
-                Some(current) => (weight, segment.index()) > (current.weight, current.next.segment_idx),
-                None => true,
-            };
-            if better {
-                *next_line = Some(NextLineWeighted {
-                    weight,
-                    next: NextLine {
-                        segment_idx: segment.index(),
-                        anchor: segment.anchor(),
-                    },
-                });
+                let weight = {
+                    let mut count = 0u32;
+                    let mut weight = Scalar::ZERO;
+                    for idx in self.rect.get_pixel_indexes_in_segment(board_segment) {
+                        weight += scalar_from_frac(self.weights[idx]);
+                        count += 1;
+                    }
+                    if count > 0 {
+                        weight / Scalar::from_num(count)
+                    } else {
+                        Scalar::ZERO
+                    }
+                };
+
+                let better = match next_line {
+                    Some(current) => {
+                        (weight, segment.index()) > (current.weight, current.next.segment_idx)
+                    }
+                    None => true,
+                };
+                if better {
+                    *next_line = Some(NextLineWeighted {
+                        weight,
+                        next: NextLine {
+                            segment_idx: segment.index(),
+                            anchor: segment.anchor(),
+                        },
+                    });
+                }
             }
         }
     }
-}
 
-/// Adapter exposing the backend selected for a particular computation.
-pub trait ComputationExecutor<B: Board, P: Pipeline<Anchor = B::Anchor>> {
-    fn workers(&self) -> usize;
-    fn for_each(&self, bufs: &mut [WorkBuffer<P>], work: ComputationWork<'_, B, P>);
-}
+    pub type WorkBuffer<P> = Option<NextLineWeighted<<P as Pipeline>::Anchor>>;
 
-impl<B, P, X> ComputationExecutor<B, P> for X
-where
-    B: Board,
-    P: Pipeline<Anchor = B::Anchor>,
-    X: Workers,
-    for<'a> X: Executor<WorkBuffer<P>, ComputationWork<'a, B, P>>,
-{
-    fn workers(&self) -> usize { Workers::workers(self) }
+    #[derive(Clone)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 
-    fn for_each(&self, bufs: &mut [WorkBuffer<P>], work: ComputationWork<'_, B, P>) {
-        Executor::for_each(self, bufs, work);
+    pub struct NextLineWeighted<A> {
+        pub next: NextLine<A>,
+        pub weight: Scalar,
+    }
+
+    #[derive(Clone, Default)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct NextLine<A> {
+        pub segment_idx: usize,
+        pub anchor: A,
+    }
+
+    impl<A: Default> Default for NextLineWeighted<A> {
+        fn default() -> Self {
+            Self {
+                next: Default::default(),
+                weight: Scalar::ZERO,
+            }
+        }
     }
 }
 
@@ -108,13 +138,21 @@ impl<B, P, X> Computation<B, P, X>
 where
     B: Board,
     P: Pipeline<Anchor = B::Anchor>,
-    X: ComputationExecutor<B, P>,
+    X: for<'a> Executor<WorkBuffer<P>, ComputationWork<'a, B, P>>,
 {
-    pub fn board(&self) -> &B { &self.inner.board }
-    pub fn rect(&self) -> &Rect<usize> { &self.inner.rect }
-    pub fn pipeline(&self) -> &P { &self.pipeline }
+    pub fn board(&self) -> &B {
+        &self.inner.board
+    }
+    pub fn rect(&self) -> &Rect<usize> {
+        &self.inner.rect
+    }
+    pub fn pipeline(&self) -> &P {
+        &self.pipeline
+    }
     /// The execution backend it was created with.
-    pub fn par(&self) -> &X { &self.inner.par }
+    pub fn par(&self) -> &X {
+        &self.inner.par
+    }
 
     pub fn new<T: IntoBoard<Board = B>>(
         par: X,
@@ -151,7 +189,7 @@ impl<B, P, X> Iterator for Computation<B, P, X>
 where
     B: Board,
     P: Pipeline<Anchor = B::Anchor>,
-    X: ComputationExecutor<B, P>,
+    X: for<'a> Executor<WorkBuffer<P>, ComputationWork<'a, B, P>>,
 {
     type Item = Result<Step<P>, StepError>;
 
@@ -165,33 +203,46 @@ where
                 };
                 segment.set_used();
                 let anchor = core::mem::replace(&mut map.anchor, line.anchor);
-                for point in self.inner.rect.get_pixel_indexes_in_segment(segment.get_segment()) {
+                for point in self
+                    .inner
+                    .rect
+                    .get_pixel_indexes_in_segment(segment.get_segment())
+                {
                     let weight = &mut map.weights[point];
                     *weight = self.inner.decay.compute(*weight);
                 }
-                Ok(Step { color: index, anchor, segment: *segment.get_segment() })
+                Ok(Step {
+                    color: index,
+                    anchor,
+                    segment: *segment.get_segment(),
+                })
             })
         })
     }
 
-    fn size_hint(&self) -> (usize, Option<usize>) { self.pipeline.size_hint() }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.pipeline.size_hint()
+    }
 }
 
 impl<B, P, X> ExactSizeIterator for Computation<B, P, X>
 where
     B: Board,
     P: Pipeline<Anchor = B::Anchor> + ExactSizeIterator,
-    X: ComputationExecutor<B, P>,
+    X: for<'a> Executor<WorkBuffer<P>, ComputationWork<'a, B, P>>,
 {
-    fn len(&self) -> usize { self.pipeline.len() }
+    fn len(&self) -> usize {
+        self.pipeline.len()
+    }
 }
 
 impl<B, P, X> FusedIterator for Computation<B, P, X>
 where
     B: Board,
     P: Pipeline<Anchor = B::Anchor> + FusedIterator,
-    X: ComputationExecutor<B, P>,
-{}
+    X: for<'a> Executor<WorkBuffer<P>, ComputationWork<'a, B, P>>,
+{
+}
 
 #[derive(Debug, thiserror::Error)]
 #[error("Computation error")]
@@ -209,9 +260,12 @@ impl<B, P, X> Inner<B, P, X>
 where
     B: Board,
     P: Pipeline<Anchor = B::Anchor>,
-    X: ComputationExecutor<B, P>,
+    X: for<'a> Executor<WorkBuffer<P>, ComputationWork<'a, B, P>>,
 {
-    fn get_best_line(&mut self, map: &mut ColorMap<P::Anchor, P::Color>) -> Option<NextLine<B::Anchor>> {
+    fn get_best_line(
+        &mut self,
+        map: &mut ColorMap<P::Anchor, P::Color>,
+    ) -> Option<NextLine<B::Anchor>> {
         let work = ComputationWork {
             board: &self.board,
             rect: &self.rect,
@@ -219,7 +273,8 @@ where
             weights: &map.weights,
         };
         self.par.for_each(&mut self.bufs, work);
-        self.bufs.iter_mut()
+        self.bufs
+            .iter_mut()
             .filter_map(|item| item.take())
             .max_by(|a, b| (a.weight, a.next.segment_idx).cmp(&(b.weight, b.next.segment_idx)))
             .map(|item| item.next)
@@ -231,25 +286,4 @@ pub struct Step<P: Pipeline> {
     pub color: P::Index,
     pub anchor: P::Anchor,
     pub segment: geometry::Segment<f32>,
-}
-
-#[derive(Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-struct NextLine<A> {
-    segment_idx: usize,
-    anchor: A,
-}
-
-#[derive(Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[doc(hidden)]
-pub struct NextLineWeighted<A> {
-    next: NextLine<A>,
-    weight: Scalar,
-}
-
-impl<A: Default> Default for NextLineWeighted<A> {
-    fn default() -> Self {
-        Self { next: Default::default(), weight: Scalar::ZERO }
-    }
 }

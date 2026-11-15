@@ -3,8 +3,7 @@ use std::sync::Arc;
 use rayon::iter::{
     IndexedParallelIterator as _, IntoParallelRefMutIterator as _, ParallelIterator as _,
 };
-use string_art_sync::{Executor, Work, Workers};
-
+use string_art_executor::{Executor, Work};
 /// Its own rayon pool, with a fixed number of threads.
 #[derive(Clone)]
 pub struct RayonExec {
@@ -20,7 +19,10 @@ impl RayonExec {
             .num_threads(threads)
             .build()
             .expect("could not create the rayon pool");
-        Self { pool: Arc::new(pool), threads }
+        Self {
+            pool: Arc::new(pool),
+            threads,
+        }
     }
 
     /// One thread per available CPU.
@@ -33,11 +35,9 @@ impl RayonExec {
 }
 
 impl Default for RayonExec {
-    fn default() -> Self { Self::auto() }
-}
-
-impl Workers for RayonExec {
-    fn workers(&self) -> usize { self.threads }
+    fn default() -> Self {
+        Self::auto()
+    }
 }
 
 impl<T, W> Executor<T, W> for RayonExec
@@ -45,9 +45,14 @@ where
     T: Send,
     W: Work<T> + Send + Sync,
 {
+    fn workers(&self) -> usize {
+        self.threads
+    }
+
     fn for_each(&self, buffers: &mut [T], work: W) {
         self.pool.install(|| {
-            buffers.par_iter_mut()
+            buffers
+                .par_iter_mut()
                 .enumerate()
                 .for_each(|(index, buffer)| work.run(index, buffer));
         });

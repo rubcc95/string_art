@@ -15,15 +15,12 @@ where
     }
 }
 
-/// Number of stable worker slots provided by an execution backend.
-pub trait Workers {
-    fn workers(&self) -> usize;
-}
-
 /// Executes typed work over independent mutable buffers.
 ///
 /// The bounds required to cross threads belong to each backend implementation,
 /// not to the core or to this trait.
 pub trait Executor<T, W: Work<T>> {
+    fn workers(&self) -> usize;
+
     fn for_each(&self, buffers: &mut [T], work: W);
 }

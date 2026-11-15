@@ -1,16 +1,14 @@
-use string_art_sync::{Executor, Work, Workers};
+use string_art_executor::{Executor, Work};
 
 /// Single-threaded executor. It deliberately accepts non-Send and non-Sync work.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SerialExec;
 
-impl Workers for SerialExec {
+impl<T, W: Work<T>> Executor<T, W> for SerialExec {
     fn workers(&self) -> usize {
         1
     }
-}
 
-impl<T, W: Work<T>> Executor<T, W> for SerialExec {
     fn for_each(&self, buffers: &mut [T], work: W) {
         for (index, buffer) in buffers.iter_mut().enumerate() {
             work.run(index, buffer);
@@ -20,11 +18,8 @@ impl<T, W: Work<T>> Executor<T, W> for SerialExec {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use std::rc::Rc;
-
-    use string_art_sync::Executor;
-
-    use super::SerialExec;
 
     #[test]
     fn accepts_non_send_buffers_and_work() {
@@ -32,7 +27,7 @@ mod tests {
         let mut buffers = [Rc::new(0)];
         SerialExec.for_each(&mut buffers, {
             let value = value.clone();
-            move |_, buffer| *buffer = value.clone()
+            move |_, buffer: &mut Rc<usize>| *buffer = value.clone()
         });
         assert_eq!(*buffers[0], 7);
         assert!(Rc::ptr_eq(&buffers[0], &value));
@@ -41,7 +36,7 @@ mod tests {
     #[test]
     fn executes_each_buffer() {
         let mut buffers = [0, 0, 0];
-        SerialExec.for_each(&mut buffers, |index, buffer| *buffer = index);
+        SerialExec.for_each(&mut buffers, |index, buffer: &mut usize| *buffer = index);
         assert_eq!(buffers, [0, 1, 2]);
     }
 }

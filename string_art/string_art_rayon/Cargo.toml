@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-string_art_sync = { workspace = true }
+string_art_executor = { workspace = true }
 rayon = "1.10"

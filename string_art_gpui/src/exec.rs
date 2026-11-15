@@ -6,7 +6,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
     },
 };
-use string_art_sync::{Executor, Work, Workers};
+use string_art::{Executor, Work};
 
 /// [`Parallel`] backend on top of the gpui background pool.
 ///
@@ -44,15 +44,16 @@ impl GpuiExec {
     }
 }
 
-impl Workers for GpuiExec {
-    fn workers(&self) -> usize { self.workers }
-}
-
 impl<T, W> Executor<T, W> for GpuiExec
 where
     T: Send,
     W: Work<T> + Send + Sync,
 {
+    #[inline]
+    fn workers(&self) -> usize {
+        self.workers
+    }
+
     fn for_each(&self, bufs: &mut [T], work: W) {
         /// Completion counter for a `for_each`.
         ///
@@ -200,13 +201,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-    use std::sync::mpsc;
-
-    use gpui::{BackgroundExecutor, ThreadedDispatcher};
-    use string_art_sync::{Executor, Workers};
+    use std::sync::{Arc, mpsc};
 
     use super::GpuiExec;
+    use gpui::{BackgroundExecutor, ThreadedDispatcher};
+    use string_art::Executor;
 
     /// Cost of a `for_each` without work: dispatch of `workers` tasks and
     /// barrier.
@@ -217,13 +216,14 @@ mod tests {
         let (tx, rx) = mpsc::channel();
 
         exec.spawn(async move {
-            let mut bufs = vec![0usize; par.workers()];
-            par.for_each(&mut bufs, |_, buf| *buf += 1); // warm-up
+            let mut bufs =
+                vec![0usize; Executor::<usize, fn(a: usize, b: &mut usize)>::workers(&par)];
+            par.for_each(&mut bufs, |_, buf: &mut usize| *buf += 1); // warm-up
 
             const CALLS: usize = 1000;
             let start = std::time::Instant::now();
             for _ in 0..CALLS {
-                par.for_each(&mut bufs, |_, buf| *buf += 1);
+                par.for_each(&mut bufs, |_, buf: &mut usize| *buf += 1);
             }
             let per_call = start.elapsed().as_secs_f64() * 1e6 / CALLS as f64;
             let _ = tx.send(per_call);

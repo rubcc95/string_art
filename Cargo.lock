@@ -4772,8 +4772,8 @@ dependencies = [
  "image",
  "serde",
  "string_art_color",
+ "string_art_executor",
  "string_art_geometry",
- "string_art_sync",
  "thiserror 2.0.21",
 ]
 
@@ -4787,6 +4787,10 @@ dependencies = [
  "string_art_geometry",
  "string_art_grid",
 ]
+
+[[package]]
+name = "string_art_executor"
+version = "0.1.0"
 
 [[package]]
 name = "string_art_geometry"
@@ -4806,7 +4810,6 @@ dependencies = [
  "image",
  "string_art",
  "string_art_serial",
- "string_art_sync",
  "wasm-bindgen",
  "wasm_thread",
  "web-time",
@@ -4824,19 +4827,15 @@ name = "string_art_rayon"
 version = "0.1.0"
 dependencies = [
  "rayon",
- "string_art_sync",
+ "string_art_executor",
 ]
 
 [[package]]
 name = "string_art_serial"
 version = "0.1.0"
 dependencies = [
- "string_art_sync",
+ "string_art_executor",
 ]
-
-[[package]]
-name = "string_art_sync"
-version = "0.1.0"
 
 [[package]]
 name = "strum"
