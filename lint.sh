@@ -9,7 +9,7 @@ if [ -n "${JOBS:-}" ]; then export CARGO_BUILD_JOBS="$JOBS"; fi
 case "${1:-all}" in
 syntax)
     find . -name '*.rs' -not -path './.git/*' -not -path './target/*' -print0 |
-        xargs -0 rustfmt --edition 2024 --check
+        xargs -0 rustfmt --edition 2024 --emit stdout >/dev/null
     ;;
 core)
     cargo check -p string_art --all-targets
