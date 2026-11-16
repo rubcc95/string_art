@@ -1,15 +1,20 @@
-# Web build (wasm) published to a branch that GitHub Pages serves.
+# Web build (wasm) published to GitHub Pages through the Pages deployment API.
 #
 # Builds on every commit to main, and can also be started manually.
 name: Deploy web
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "string_art/**"
+      - "string_art_gpui/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/web/**"
+      - ".github/workflows/web.yml"
   workflow_dispatch:
     inputs:
-      branch:
-        description: "Branch that GitHub Pages publishes"
-        required: false
-        default: gh-pages
       threads:
         description: "Multithreaded wasm (nightly). Adds the COOP/COEP service worker."
         type: boolean
@@ -23,11 +28,13 @@ on:
         default: release
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 concurrency:
-  group: web-deploy
-  cancel-in-progress: true
+  group: pages
+  cancel-in-progress: false
 
 env:
   CARGO_TERM_COLOR: always
@@ -35,8 +42,11 @@ env:
 
 jobs:
   deploy:
-    name: Build and publish
+    name: Build and deploy
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout
@@ -106,41 +116,31 @@ jobs:
           rm -rf site
           mkdir -p site
           cp "$web/index.html" "$web/string_art_gpui.js" "$wasm" "$web"/*.d.ts site/
-          touch site/.nojekyll
           if [ "$THREADS" = "true" ]; then
             cp .github/web/coi-serviceworker.js site/
             grep -q "coi-serviceworker.js" site/index.html ||
               sed -i 's#</head>#<script src="coi-serviceworker.js"></script>\n</head>#' site/index.html
           fi
 
-      - name: Publish to the Pages branch
-        shell: bash
-        env:
-          BRANCH: ${{ inputs.branch || 'gh-pages' }}
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          cd site
-          git init -q
-          git checkout -q -b "$BRANCH"
-          git config user.name "Rubén Cantón Casado"
-          git config user.email "rubcc95@gmail.com"
-          git add -A
-          git commit -q --allow-empty -m "Web build ${GITHUB_SHA}"
-          git push --force \
-            "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
-            "HEAD:refs/heads/${BRANCH}"
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
 
       - name: Summary
         env:
-          BRANCH: ${{ inputs.branch || 'gh-pages' }}
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
         run: |
           {
             echo "### Web build published"
             echo ""
             echo "| Field | Value |"
             echo "| --- | --- |"
-            echo "| Branch | \`${BRANCH}\` |"
+            echo "| URL | ${PAGE_URL} |"
             echo "| Threads | \`${{ inputs.threads || 'true' }}\` |"
             echo "| Profile | \`${{ inputs.profile || 'release' }}\` |"
             echo "| Commit | \`${GITHUB_SHA}\` |"
