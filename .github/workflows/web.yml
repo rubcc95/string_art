@@ -4,15 +4,6 @@
 name: Deploy web
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "string_art/**"
-      - "string_art_gpui/**"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - ".github/web/**"
-      - ".github/workflows/web.yml"
   workflow_dispatch:
     inputs:
       threads:
