@@ -1,7 +1,18 @@
 [package]
 name = "string_art"
-version = "0.1.0"
-edition = "2024"
+description = "Convert images into thread patterns for creating string art, with textual instructions and a graphical preview."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+exclude = [".vscode"]
 
 
 [dependencies]

@@ -1,0 +1,7 @@
+[workspace]
+shared-version = true
+consolidate-commits = true
+tag-name = "v{{version}}"
+pre-release-commit-message = "chore(release): v{{version}}"
+allow-branch = ["main"]
+publish = true

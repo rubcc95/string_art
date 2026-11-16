@@ -1210,6 +1210,7 @@ checksum = "1e0e367e4e7da84520dedcac1901e4da967309406d1e51017ae1abfb97adbd38"
 dependencies = [
  "bitflags 2.13.2",
  "block2 0.6.2",
+ "libc",
  "objc2 0.6.5",
 ]
 
@@ -1872,7 +1873,7 @@ dependencies = [
  "parking",
  "parking_lot",
  "pin-project",
- "pollster",
+ "pollster 0.4.0",
  "profiling",
  "rand 0.9.5",
  "raw-window-handle",
@@ -3860,6 +3861,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2f3a9f18d041e6d0e102a0a46750538147e5e8992d3b4873aaafee2520b00ce3"
 
 [[package]]
+name = "pollster"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc6355899e1c9462875b6757c79f3caa011a1fdae12bbb1a2e72dd1f234f8336"
+
+[[package]]
 name = "polycool"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4281,6 +4288,34 @@ dependencies = [
  "tiny-skia",
  "usvg",
  "zune-jpeg",
+]
+
+[[package]]
+name = "rfd"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4b9d4857b10297ffb0f64cae711e983a7aeaee561848d56d429d3858bd8ed93"
+dependencies = [
+ "block2 0.6.2",
+ "dispatch2",
+ "js-sys",
+ "libc",
+ "log",
+ "objc2 0.6.5",
+ "objc2-app-kit 0.3.2",
+ "objc2-core-foundation",
+ "objc2-foundation 0.3.2",
+ "objc2-uniform-type-identifiers",
+ "percent-encoding",
+ "pollster 1.0.1",
+ "raw-window-handle",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wayland-backend",
+ "wayland-client",
+ "wayland-protocols",
+ "web-sys",
+ "windows-sys",
 ]
 
 [[package]]
@@ -4765,7 +4800,7 @@ dependencies = [
 
 [[package]]
 name = "string_art"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "derive_more",
  "fixed",
@@ -4779,7 +4814,7 @@ dependencies = [
 
 [[package]]
 name = "string_art_color"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "derive_more",
  "image",
@@ -4790,11 +4825,11 @@ dependencies = [
 
 [[package]]
 name = "string_art_executor"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 
 [[package]]
 name = "string_art_geometry"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "bresenham",
  "num-traits",
@@ -4803,28 +4838,33 @@ dependencies = [
 
 [[package]]
 name = "string_art_gpui"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "gpui",
  "gpui_platform",
  "image",
+ "js-sys",
+ "rfd",
  "string_art",
  "string_art_serial",
+ "thiserror 2.0.21",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "wasm_thread",
+ "web-sys",
  "web-time",
 ]
 
 [[package]]
 name = "string_art_grid"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "string_art_geometry",
 ]
 
 [[package]]
 name = "string_art_rayon"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "rayon",
  "string_art_executor",
@@ -4832,7 +4872,7 @@ dependencies = [
 
 [[package]]
 name = "string_art_serial"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "string_art_executor",
 ]

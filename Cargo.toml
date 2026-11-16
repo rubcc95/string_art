@@ -11,15 +11,31 @@ members = [
     "string_art_gpui",
 ]
 
+[workspace.package]
+version = "0.2.0-alpha.1"
+edition = "2024"
+authors = ["Rubén Cantón Casado <rubcc95@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/rubcc95/string_art"
+homepage = "https://rubcc95.github.io/string_art/"
+# Relative to the workspace root, so every member shares this README.
+readme = "README.md"
+keywords = ["string-art", "image", "image-processing"]
+categories = ["multimedia::images", "graphics"]
+rust-version = "1.85"
+publish = true
+
 [workspace.dependencies]
-# Internal crates. Paths are relative to this manifest, so the
-# members do not depend on where they are placed inside the workspace.
-string_art = { path = "string_art" }
-string_art_executor = { path = "string_art/string_art_executor", default-features = false }
-string_art_geometry = { path = "string_art/string_art_geometry", default-features = false }
-string_art_grid = { path = "string_art/string_art_grid" }
-string_art_serial = { path = "string_art/string_art_serial" }
-string_art_color = { path = "string_art/string_art_color", default-features = false }
+# Internal crates. `path` is what the workspace builds against; `version` is
+# what gets published, because Cargo strips `path` when packaging. Both must
+# match the package version so `cargo publish` can resolve the crates from
+# crates.io.
+string_art = { version = "0.2.0-alpha.1", path = "string_art" }
+string_art_executor = { version = "0.2.0-alpha.1", path = "string_art/string_art_executor", default-features = false }
+string_art_geometry = { version = "0.2.0-alpha.1", path = "string_art/string_art_geometry", default-features = false }
+string_art_grid = { version = "0.2.0-alpha.1", path = "string_art/string_art_grid" }
+string_art_serial = { version = "0.2.0-alpha.1", path = "string_art/string_art_serial" }
+string_art_color = { version = "0.2.0-alpha.1", path = "string_art/string_art_color", default-features = false }
 
 num-traits = "^0.2"
 thiserror = "^2.0"

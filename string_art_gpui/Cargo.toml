@@ -1,7 +1,19 @@
 [package]
 name = "string_art_gpui"
-version = "0.1.0"
-edition = "2024"
+description = "GPUI frontend for string_art."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+rust-version.workspace = true
+# Not publishable: gpui, gpui_platform and wasm_thread are git dependencies,
+# which crates.io rejects. Set explicitly instead of inheriting `publish`.
+publish = false
 
 [features]
 default = ["multithreaded"]
@@ -16,7 +28,19 @@ multithreaded = [
 [dependencies]
 string_art = { workspace = true }
 string_art_serial = { workspace = true }
-image = { workspace = true }
+image = { workspace = true, features = [
+    "bmp",
+    "gif",
+    "ico",
+    "jpeg",
+    "png",
+    "pnm",
+    "qoi",
+    "tga",
+    "tiff",
+    "webp",
+] }
+thiserror = { workspace = true }
 web-time = "1.1"
 gpui = { git = "https://github.com/zed-industries/zed", default-features = false }
 gpui_platform = { git = "https://github.com/zed-industries/zed", default-features = false }
@@ -24,9 +48,30 @@ gpui_platform = { git = "https://github.com/zed-industries/zed", default-feature
 [target.'cfg(all(any(target_os = "linux", target_os = "freebsd"), not(target_env = "ohos")))'.dependencies]
 gpui_platform = { git = "https://github.com/zed-industries/zed", default-features = false, features = ["x11", "wayland"] }
 
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+rfd = "0.18"
+
 [target.'cfg(target_family = "wasm")'.dependencies]
 wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
 wasm_thread = { git = "https://github.com/zed-industries/wasm_thread", rev = "0cf96c7708dfb97ccf3da50347e25edcf75d6937", features = ["es_modules"], optional = true }
+web-sys = { version = "0.3", features = [
+    "AddEventListenerOptions",
+    "Blob",
+    "DataTransfer",
+    "Document",
+    "DragEvent",
+    "Element",
+    "Event",
+    "EventTarget",
+    "File",
+    "FileList",
+    "HtmlElement",
+    "HtmlInputElement",
+    "Node",
+    "Window",
+] }
 
 [dev-dependencies]
 gpui = { git = "https://github.com/zed-industries/zed", default-features = false, features = ["bench-support"] }

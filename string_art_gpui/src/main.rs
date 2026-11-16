@@ -1,125 +1,23 @@
-//! The application: a gpui window that measures sequential and parallel computation.
+//! The String Art application.
 
 #![cfg_attr(target_family = "wasm", no_main)]
 
+mod app;
+#[allow(dead_code)]
 mod bench;
 #[cfg(feature = "multithreaded")]
+#[allow(dead_code)]
 mod exec;
+mod import;
+mod ui;
 
 use std::borrow::Cow;
 
 use gpui::{
-    App, Bounds, Context, Render, Window, WindowBounds, WindowOptions, div, prelude::*, px, rgb,
-    size,
+    App, AppContext as _, Bounds, TitlebarOptions, WindowBounds, WindowDecorations, WindowOptions,
+    point, px, size,
 };
 use gpui_platform::application;
-use web_time::Instant;
-
-#[cfg(feature = "multithreaded")]
-use crate::exec::GpuiExec;
-
-struct View {
-    serial_ms: Option<f64>,
-    parallel_ms: Option<f64>,
-    running: bool,
-}
-
-impl View {
-    fn start(&mut self, parallel: bool, cx: &mut Context<Self>) {
-        if self.running {
-            return;
-        }
-        self.running = true;
-        cx.notify();
-
-        let exec = cx.background_executor().clone();
-        cx.spawn(async move |this, cx| {
-            let ms = exec
-                .clone()
-                .spawn(async move {
-                    let start = Instant::now();
-
-                    #[cfg(feature = "multithreaded")]
-                    {
-                        if parallel {
-                            bench::run(GpuiExec::new(exec));
-                        } else {
-                            bench::run(string_art_serial::SerialExec);
-                        }
-                    }
-                    #[cfg(not(feature = "multithreaded"))]
-                    bench::run(string_art_serial::SerialExec);
-
-                    start.elapsed().as_secs_f64() * 1000.0
-                })
-                .await;
-
-            let _ = this.update(cx, |this, cx| {
-                if parallel {
-                    this.parallel_ms = Some(ms);
-                } else {
-                    this.serial_ms = Some(ms);
-                }
-                this.running = false;
-                cx.notify();
-            });
-        })
-        .detach();
-    }
-}
-
-impl Render for View {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        div()
-            .flex()
-            .flex_col()
-            .gap_3()
-            .size(px(480.0))
-            .justify_center()
-            .items_center()
-            .bg(rgb(0x1e1e1e))
-            .text_xl()
-            .text_color(rgb(0xffffff))
-            .child("String Art")
-            .child(
-                div()
-                    .flex()
-                    .gap_2()
-                    .child(
-                        div()
-                            .id("serial")
-                            .px_4()
-                            .py_2()
-                            .rounded_md()
-                            .bg(rgb(0x2563eb))
-                            .cursor_pointer()
-                            .child("Sequential")
-                            .on_click(cx.listener(|this, _, _, cx| this.start(false, cx))),
-                    )
-                    .child(
-                        div()
-                            .id("parallel")
-                            .px_4()
-                            .py_2()
-                            .rounded_md()
-                            .bg(rgb(0x2563eb))
-                            .cursor_pointer()
-                            .child("Parallel")
-                            .on_click(cx.listener(|this, _, _, cx| this.start(true, cx))),
-                    ),
-            )
-            .child(format!(
-                "Sequential: {}",
-                self.serial_ms
-                    .map_or_else(|| "—".to_string(), |ms| format!("{ms:.1} ms"))
-            ))
-            .child(format!(
-                "Parallel: {}",
-                self.parallel_ms
-                    .map_or_else(|| "—".to_string(), |ms| format!("{ms:.1} ms"))
-            ))
-    }
-}
 
 fn run() {
     application().run(|cx: &mut App| {
@@ -129,22 +27,39 @@ fn run() {
             ))])
             .expect("failed to load application fonts");
 
-        let bounds = Bounds::centered(None, size(px(480.), px(320.)), cx);
+        let restore_bounds = Bounds::centered(None, size(px(1280.), px(800.)), cx);
+        let view = cx.new(app::AppView::new);
+        let window_view = view.clone();
 
         cx.open_window(
             WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
+                // Hide the native caption so the application can draw its own
+                // title bar. On macOS the traffic lights stay native and are
+                // positioned to match the title bar height.
+                titlebar: Some(TitlebarOptions {
+                    title: Some("String Art".into()),
+                    appears_transparent: true,
+                    traffic_light_position: Some(point(px(18.), px(22.))),
+                }),
+                window_bounds: Some(WindowBounds::Maximized(restore_bounds)),
+                // Client-side decorations on Linux; ignored elsewhere.
+                window_decorations: Some(WindowDecorations::Client),
+                // macOS: the application moves the window itself.
+                app_owns_titlebar_drag: true,
+                app_id: Some("string_art".into()),
+                window_min_size: Some(size(px(720.), px(520.))),
                 ..Default::default()
             },
-            |_, cx| {
-                cx.new(|_| View {
-                    serial_ms: None,
-                    parallel_ms: None,
-                    running: false,
-                })
+            move |window, cx| {
+                window_view.update(cx, |view, cx| {
+                    view.install_window_observers(window, cx);
+                });
+                window_view
             },
         )
         .unwrap();
+
+        app::init_import(view, cx.to_async());
 
         cx.activate(true);
     });
