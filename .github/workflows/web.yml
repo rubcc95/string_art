@@ -102,7 +102,7 @@ jobs:
           web=string_art_gpui/web
           wasm="$web/string_art_gpui_bg.wasm"
           size=$(stat -c %s "$wasm")
-          sed -i -E "s/(name=\\"wasm-bytes\\" content=\\")[0-9]+(\\")/\\1${size}\\2/" "$web/index.html"
+          sed -i -E "s/(name=\"wasm-bytes\" content=\")[0-9]+(\")/\1${size}\2/" "$web/index.html"
           rm -rf site
           mkdir -p site
           cp "$web/index.html" "$web/string_art_gpui.js" "$wasm" "$web"/*.d.ts site/
@@ -110,7 +110,7 @@ jobs:
           if [ "$THREADS" = "true" ]; then
             cp .github/web/coi-serviceworker.js site/
             grep -q "coi-serviceworker.js" site/index.html ||
-              sed -i 's#</head>#<script src="coi-serviceworker.js"></script>\\n</head>#' site/index.html
+              sed -i 's#</head>#<script src="coi-serviceworker.js"></script>\n</head>#' site/index.html
           fi
 
       - name: Publish to the Pages branch
