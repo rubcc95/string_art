@@ -2,8 +2,9 @@
 
 use gpui::{Context, Window, div, prelude::*, px, rgb};
 
-use crate::app::{AppView, DragHover};
+use crate::app::AppView;
 use crate::ui;
+use crate::ui::DragHover;
 
 impl AppView {
     pub(in crate::app) fn import_screen(
@@ -12,7 +13,6 @@ impl AppView {
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
         let busy = self.busy;
-        let error = self.error.clone();
         let drag_accepted = matches!(self.drag_hover, Some(DragHover::Accepted { .. }));
         let drag_rejected = matches!(self.drag_hover, Some(DragHover::Rejected { .. }));
 
@@ -97,10 +97,7 @@ impl AppView {
                                                  and TGA",
                                             ),
                                     ),
-                            )
-                            .when(error.is_some(), |column| {
-                                column.child(ui::error_banner(error.as_deref().unwrap_or_default()))
-                            }),
+                            ),
                     ),
             )
     }

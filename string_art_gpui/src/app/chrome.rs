@@ -34,7 +34,6 @@ impl AppView {
             .h_full()
             .flex()
             .items_center()
-            .pl_3()
             .text_lg()
             .child("String Art");
 
@@ -53,6 +52,7 @@ impl AppView {
             .h(ui::title_bar::HEIGHT)
             .flex()
             .items_center()
+            .gap_2()
             .border_b_1()
             .border_color(rgb(ui::BORDER))
             .bg(rgb(ui::PANEL))
@@ -61,7 +61,7 @@ impl AppView {
             .pr(ui::title_bar::RIGHT_INSET)
             .children(ui::title_bar::left_controls(window, cx))
             .child(drag_region)
-            .child(trailing)
+            .child(div().flex_none().flex().items_center().child(trailing))
             .children(ui::title_bar::right_controls(window, cx))
     }
 

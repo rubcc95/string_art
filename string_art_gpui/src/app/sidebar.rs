@@ -1,0 +1,156 @@
+//! Image sidebar, compact switcher and mobile picker.
+
+use gpui::{Context, ObjectFit, Window, div, img, prelude::*, px, rgb};
+
+use crate::ui;
+
+use super::{AppView, ImageTab};
+
+impl AppView {
+    pub(super) fn image_sidebar(
+        &self,
+        active: usize,
+        rail: bool,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        let items = self
+            .images
+            .iter()
+            .enumerate()
+            .map(|(index, tab)| ui::ListItem {
+                leading: img(tab.image.preview.clone())
+                    .size(px(32.))
+                    .rounded_md()
+                    .object_fit(ObjectFit::Cover)
+                    .into_any_element(),
+                title: tab.image.name.clone().into(),
+                subtitle: None,
+                trailing: Some(
+                    div()
+                        .text_xs()
+                        .text_color(rgb(ui::FAINT))
+                        .child(tab.computations.len().to_string())
+                        .into_any_element(),
+                ),
+                active: index == active,
+                height: px(44.),
+            })
+            .collect::<Vec<_>>();
+
+        let footer = ui::sidebar_import_button(rail)
+            .on_click(cx.listener(|this, _, window, cx| this.pick_image(window, cx)))
+            .into_any_element();
+
+        let entity = cx.entity();
+        ui::sidebar(
+            "image-sidebar",
+            if rail {
+                ui::SIDEBAR_RAIL_WIDTH
+            } else {
+                ui::SIDEBAR_WIDTH
+            },
+            rail,
+            items,
+            Some(footer),
+            move |index, window, cx| {
+                entity.update(cx, |this, cx| this.select_image(index, window, cx));
+            },
+        )
+    }
+
+    pub(super) fn image_switcher(
+        &self,
+        tab: &ImageTab,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        ui::switcher_button(
+            "image-switcher",
+            img(tab.image.preview.clone())
+                .size(px(22.))
+                .rounded_sm()
+                .object_fit(ObjectFit::Cover)
+                .into_any_element(),
+            tab.image.name.clone(),
+            cx.listener(|this, _, window, cx| {
+                this.commit_active_settings(window, cx);
+                this.image_picker_open = !this.image_picker_open;
+                cx.notify();
+            }),
+        )
+    }
+
+    pub(super) fn image_picker(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let active = self.active_image;
+        let rows = self
+            .images
+            .iter()
+            .enumerate()
+            .map(|(index, tab)| {
+                let item = ui::ListItem {
+                    leading: img(tab.image.preview.clone())
+                        .size(px(38.))
+                        .rounded_md()
+                        .object_fit(ObjectFit::Cover)
+                        .into_any_element(),
+                    title: tab.image.name.clone().into(),
+                    subtitle: Some(
+                        format!(
+                            "{} × {} px · {} computaciones",
+                            tab.image.width,
+                            tab.image.height,
+                            tab.computations.len()
+                        )
+                        .into(),
+                    ),
+                    trailing: None,
+                    active: Some(index) == active,
+                    height: px(52.),
+                };
+                ui::list_item(("picker-row", index), item, false).on_click(
+                    cx.listener(move |this, _, window, cx| this.select_image(index, window, cx)),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        let content = div()
+            .id("image-picker-list")
+            .flex_1()
+            .min_h_0()
+            .overflow_y_scroll()
+            .flex()
+            .flex_col()
+            .gap_1()
+            .p_3()
+            .children(rows)
+            .into_any_element();
+
+        let footer = div()
+            .flex_none()
+            .p_3()
+            .pt_0()
+            .child(
+                ui::primary_button("picker-import", "Importar imagen", true)
+                    .w_full()
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.image_picker_open = false;
+                        this.pick_image(window, cx);
+                    })),
+            )
+            .into_any_element();
+
+        let entity = cx.entity();
+        ui::bottom_sheet(
+            "image-picker",
+            "Imágenes",
+            content,
+            Some(footer),
+            move |_, cx| {
+                entity.update(cx, |this, cx| {
+                    this.image_picker_open = false;
+                    cx.notify();
+                });
+            },
+        )
+    }
+}

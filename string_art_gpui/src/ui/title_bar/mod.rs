@@ -15,7 +15,11 @@
 use gpui::{Pixels, px};
 
 /// Height of the application title bar.
-pub const HEIGHT: Pixels = px(56.);
+pub const HEIGHT: Pixels = px(44.);
+
+/// Window controls shared by the platforms that draw them.
+#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "windows"))]
+mod controls;
 
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
 mod linux;

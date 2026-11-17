@@ -203,7 +203,7 @@ fn read_and_import(file: File, view: Entity<AppView>, app: AsyncApp) {
     if matches!(import::extension_support(Path::new(&name)), Some(false)) {
         let message = unsupported_file_message(&name);
         let mut app = app;
-        let _ = view.update(&mut app, |this, cx| this.set_error(message, cx));
+        let _ = view.update(&mut app, |this, cx| this.import_error(message, cx));
         return;
     }
 
@@ -215,7 +215,7 @@ fn read_and_import(file: File, view: Entity<AppView>, app: AsyncApp) {
             }
             None => {
                 let _ = view.update(&mut app, |this, cx| {
-                    this.set_error("The selected file could not be read.".to_string(), cx)
+                    this.import_error("The selected file could not be read.".to_string(), cx)
                 });
             }
         }

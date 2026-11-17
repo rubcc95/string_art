@@ -12,11 +12,12 @@
 use gpui::{
     AnyElement, App, CursorStyle, Decorations, Div, InteractiveElement, IntoElement,
     MAX_BUTTONS_PER_SIDE, MouseButton, ParentElement, Pixels, ResizeEdge, Stateful,
-    StatefulInteractiveElement, Styled, Tiling, Window, WindowButton, WindowButtonLayout, div, px,
-    rgb,
+    StatefulInteractiveElement, Styled, Tiling, Window, WindowButton, WindowButtonLayout, div,
+    prelude::FluentBuilder as _, px, rgb,
 };
 
-use crate::ui::{PANEL, TEXT};
+use super::controls::{self, Glyph};
+use crate::ui::TEXT;
 
 pub const LEFT_INSET: Pixels = px(12.);
 pub const RIGHT_INSET: Pixels = px(12.);
@@ -40,18 +41,18 @@ pub fn custom_chrome(window: &Window) -> bool {
     matches!(window.window_decorations(), Decorations::Client { .. })
 }
 
-pub fn left_controls(window: &Window, cx: &App) -> Option<Div> {
+pub fn left_controls(window: &mut Window, cx: &mut App) -> Option<Div> {
     if !custom_chrome(window) {
         return None;
     }
-    linux_controls(button_layout(cx).left, ControlEdge::Left, window)
+    linux_controls(button_layout(cx).left, window, cx)
 }
 
-pub fn right_controls(window: &Window, cx: &App) -> Option<Div> {
+pub fn right_controls(window: &mut Window, cx: &mut App) -> Option<Div> {
     if !custom_chrome(window) {
         return None;
     }
-    linux_controls(button_layout(cx).right, ControlEdge::Right, window)
+    linux_controls(button_layout(cx).right, window, cx)
 }
 
 /// Resize handles are only needed with client-side decorations, and only when
@@ -75,16 +76,10 @@ fn button_layout(cx: &App) -> WindowButtonLayout {
     })
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ControlEdge {
-    Left,
-    Right,
-}
-
 fn linux_controls(
     buttons: [Option<WindowButton>; MAX_BUTTONS_PER_SIDE],
-    edge: ControlEdge,
-    window: &Window,
+    window: &mut Window,
+    cx: &mut App,
 ) -> Option<Div> {
     let supported = window.window_controls();
     let is_maximized = window.is_maximized();
@@ -97,45 +92,56 @@ fn linux_controls(
             WindowButton::Maximize => supported.maximize && window.is_resizable(),
             WindowButton::Close => true,
         })
-        .map(|button| linux_control(button, is_maximized).into_any_element())
+        .collect::<Vec<_>>()
+        .into_iter()
+        .map(|button| linux_control(button, is_maximized, window, cx).into_any_element())
         .collect();
 
     if elements.is_empty() {
         return None;
     }
 
-    let row = div()
-        .flex()
-        .items_center()
-        .h_full()
-        .gap_1()
-        .children(elements);
-
-    Some(match edge {
-        ControlEdge::Left => row.pl_2(),
-        ControlEdge::Right => row.pr_2(),
-    })
+    Some(
+        div()
+            .flex()
+            .items_center()
+            .h_full()
+            .gap_1()
+            .children(elements),
+    )
 }
 
-fn linux_control(button: WindowButton, is_maximized: bool) -> Stateful<Div> {
+fn linux_control(
+    button: WindowButton,
+    is_maximized: bool,
+    window: &mut Window,
+    cx: &mut App,
+) -> Stateful<Div> {
+    let id = match button {
+        WindowButton::Minimize => "window-control-minimize",
+        WindowButton::Maximize => "window-control-maximize",
+        WindowButton::Close => "window-control-close",
+    };
     let is_close = button == WindowButton::Close;
     let hover_background = if is_close { CLOSE_HOVER } else { CONTROL_HOVER };
 
+    let hover = controls::use_hover(format!("window-control-hover-{id}"), window, cx);
+    let fill = controls::hover_fill(
+        format!("window-control-fill-{id}"),
+        hover.get(cx),
+        rgb(hover_background),
+        div().absolute().top_0().left_0().size_full().rounded_full(),
+    );
+
     div()
-        .id(match button {
-            WindowButton::Minimize => "window-control-minimize",
-            WindowButton::Maximize => "window-control-maximize",
-            WindowButton::Close => "window-control-close",
-        })
+        .id(id)
         .flex()
         .items_center()
         .justify_center()
-        .size(px(24.))
-        .rounded_full()
-        .group("window-control")
+        .size(px(32.))
         .cursor_pointer()
-        .hover(move |style| style.bg(rgb(hover_background)))
-        .active(move |style| style.bg(rgb(hover_background)))
+        .when(is_close, |button| button.group("window-control-close"))
+        .on_hover(hover.listener())
         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
         .on_click(move |_, window, cx| {
             cx.stop_propagation();
@@ -145,51 +151,24 @@ fn linux_control(button: WindowButton, is_maximized: bool) -> Stateful<Div> {
                 WindowButton::Close => window.remove_window(),
             }
         })
-        .child(linux_icon(button, is_maximized))
+        .child(
+            div()
+                .relative()
+                .size(px(20.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .child(fill)
+                .child(linux_icon(button, is_maximized)),
+        )
 }
 
 fn linux_icon(button: WindowButton, is_maximized: bool) -> AnyElement {
     match button {
-        WindowButton::Minimize => div()
-            .w(px(10.))
-            .h(px(1.))
-            .rounded_full()
-            .bg(rgb(TEXT))
-            .into_any_element(),
-        WindowButton::Maximize if is_maximized => div()
-            .relative()
-            .size(px(11.))
-            .child(
-                div()
-                    .absolute()
-                    .top_0()
-                    .right_0()
-                    .size(px(7.))
-                    .border_1()
-                    .border_color(rgb(TEXT)),
-            )
-            .child(
-                div()
-                    .absolute()
-                    .bottom_0()
-                    .left_0()
-                    .size(px(7.))
-                    .border_1()
-                    .border_color(rgb(TEXT))
-                    .bg(rgb(PANEL)),
-            )
-            .into_any_element(),
-        WindowButton::Maximize => div()
-            .size(px(10.))
-            .border_1()
-            .border_color(rgb(TEXT))
-            .into_any_element(),
-        WindowButton::Close => div()
-            .text_size(px(16.))
-            .text_color(rgb(TEXT))
-            .group_hover("window-control", |style| style.text_color(rgb(0xffffff)))
-            .child("×")
-            .into_any_element(),
+        WindowButton::Minimize => controls::glyph(Glyph::Minimize, rgb(TEXT)),
+        WindowButton::Maximize if is_maximized => controls::glyph(Glyph::Restore, rgb(TEXT)),
+        WindowButton::Maximize => controls::glyph(Glyph::Maximize, rgb(TEXT)),
+        WindowButton::Close => controls::close_icon(),
     }
 }
 

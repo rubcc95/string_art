@@ -14,11 +14,11 @@ pub fn custom_chrome(_window: &Window) -> bool {
     false
 }
 
-pub fn left_controls(_window: &Window, _cx: &App) -> Option<Div> {
+pub fn left_controls(_window: &mut Window, _cx: &mut App) -> Option<Div> {
     None
 }
 
-pub fn right_controls(_window: &Window, _cx: &App) -> Option<Div> {
+pub fn right_controls(_window: &mut Window, _cx: &mut App) -> Option<Div> {
     None
 }
 

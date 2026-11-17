@@ -4,12 +4,14 @@
 mod screen;
 pub(super) mod sources;
 
-use gpui::{Context, Window};
+use gpui::{AppContext as _, Context, Window};
 
 use crate::import::{ImportError, ImportedImage, decode};
 use crate::ui;
+use crate::ui::{DragHover, DragOverlay, Toast};
 
-use super::{AppView, DragHover, DragOverlay, Tab};
+use super::settings::{Settings, SettingsPanel, SettingsPanelEvent};
+use super::{AppView, ImageTab};
 
 impl AppView {
     fn begin_import(&mut self, cx: &mut Context<Self>) -> bool {
@@ -17,7 +19,6 @@ impl AppView {
             return false;
         }
         self.busy = true;
-        self.error = None;
         cx.notify();
         true
     }
@@ -30,20 +31,28 @@ impl AppView {
         self.busy = false;
         match result {
             Ok(image) => {
-                if let Some(index) = self.active {
-                    if let Some(tab) = self.tabs.get_mut(index) {
-                        tab.image = image;
-                    } else {
-                        self.tabs.push(Tab { image });
-                        self.active = Some(self.tabs.len() - 1);
+                let settings = Settings::default();
+                let panel = cx.new(|cx| SettingsPanel::new(settings, cx));
+                let subscription = cx.subscribe(&panel, |this, source, event, cx| {
+                    let SettingsPanelEvent::Changed(settings) = *event;
+                    if let Some(tab) = this.images.iter_mut().find(|tab| tab.panel == source) {
+                        tab.settings = settings;
+                        cx.notify();
                     }
-                } else {
-                    self.tabs.push(Tab { image });
-                    self.active = Some(self.tabs.len() - 1);
-                }
-                self.error = None;
+                });
+                self.images.push(ImageTab {
+                    image,
+                    settings,
+                    panel,
+                    _settings_subscription: subscription,
+                    computations: Vec::new(),
+                    active: None,
+                });
+                self.active_image = Some(self.images.len() - 1);
             }
-            Err(error) => self.error = Some(error.to_string()),
+            Err(error) => {
+                self.toast(Toast::error("Import failed", Some(error.to_string())), cx);
+            }
         }
         cx.notify();
     }
@@ -139,10 +148,10 @@ impl AppView {
         sources::pick(window, cx);
     }
 
-    pub fn set_error(&mut self, message: String, cx: &mut Context<Self>) {
-        self.error = Some(message);
+    /// Reports an import failure without leaving the import UI in a busy state.
+    pub fn import_error(&mut self, message: String, cx: &mut Context<Self>) {
         self.busy = false;
-        cx.notify();
+        self.toast(Toast::error("Import failed", Some(message)), cx);
     }
 
     /// Drop feedback for platforms that only report whether files are over the

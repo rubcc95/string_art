@@ -7,8 +7,9 @@ use gpui::{
     WeakEntity, Window, prelude::*,
 };
 
-use crate::app::{AppView, DragHover};
+use crate::app::AppView;
 use crate::import::{self, ImportError};
+use crate::ui::DragHover;
 
 /// Nothing to install: the native picker is opened on demand and drops are
 /// delivered by gpui itself.
@@ -30,7 +31,7 @@ pub fn pick(window: &mut Window, cx: &mut Context<AppView>) {
 
         if matches!(import::extension_support(&path), Some(false)) {
             let message = import::unsupported_file_message(&display_name(&path));
-            let _ = this.update(cx, |this, cx| this.set_error(message, cx));
+            let _ = this.update(cx, |this, cx| this.import_error(message, cx));
             return;
         }
 
@@ -65,7 +66,7 @@ pub fn attach_drop(root: Stateful<Div>, cx: &mut Context<AppView>) -> Stateful<D
             None => {
                 let name = dropped_name(paths);
                 let message = import::unsupported_file_message(&name);
-                this.set_error(message, cx);
+                this.import_error(message, cx);
             }
         }
     }))
@@ -118,7 +119,7 @@ async fn read_and_send(path: PathBuf, this: WeakEntity<AppView>, cx: &mut AsyncA
             let _ = this.update(cx, |this, cx| this.import_bytes(name, bytes, cx));
         }
         Err(error) => {
-            let _ = this.update(cx, |this, cx| this.set_error(error.to_string(), cx));
+            let _ = this.update(cx, |this, cx| this.import_error(error.to_string(), cx));
         }
     }
 }

@@ -2,6 +2,10 @@
 
 mod chrome;
 mod import;
+mod settings;
+mod sidebar;
+mod tabs;
+mod toast;
 mod workspace;
 
 use gpui::{AsyncApp, Context, Entity, Render, Subscription, Window, div, prelude::*, rgb};
@@ -9,43 +13,45 @@ use gpui::{AsyncApp, Context, Entity, Render, Subscription, Window, div, prelude
 use crate::import::ImportedImage;
 use crate::ui;
 
-/// One imported image. Later it will also hold the computation settings and
-/// its output; the application is already built around more than one tab.
-struct Tab {
+use settings::{Settings, SettingsPanel};
+
+/// One imported image and everything derived from it.
+struct ImageTab {
     image: ImportedImage,
+    /// The settings currently being edited for this image. Computations keep
+    /// their own frozen copy so editing these does not alter them.
+    settings: Settings,
+    /// The editor that owns the numeric fields and sliders.
+    panel: Entity<SettingsPanel>,
+    /// Keeps the panel -> model subscription alive for as long as the tab.
+    _settings_subscription: Subscription,
+    computations: Vec<ComputationTab>,
+    /// `None` shows the settings view. Computations are selected by index.
+    active: Option<usize>,
 }
 
-/// What the application is showing about the file being dragged over it.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum DragHover {
-    /// The dropped file can be imported. The name is only known on desktop.
-    Accepted { name: Option<String> },
-    /// The dropped file cannot be imported.
-    Rejected { name: String },
-    /// An import is running and drops are ignored for now.
-    Busy,
-}
-
-/// The drag overlay, which outlives the drag itself while it fades out.
-#[derive(Clone, Debug)]
-pub struct DragOverlay {
-    pub hover: DragHover,
-    /// Whether the overlay is fading out after the drag ended.
-    pub leaving: bool,
-    /// Identifies each entry/exit so its animations start from the beginning
-    /// and stale exit timers can be ignored.
-    pub transition: u64,
+/// One computation started from an image's settings.
+struct ComputationTab {
+    name: String,
+    /// The settings the computation was started with.
+    #[allow(dead_code)] // Used once computations actually run.
+    settings: Settings,
 }
 
 pub struct AppView {
-    tabs: Vec<Tab>,
-    active: Option<usize>,
+    images: Vec<ImageTab>,
+    active_image: Option<usize>,
+    /// Whether the compact image picker sheet is open.
+    image_picker_open: bool,
     busy: bool,
-    error: Option<String>,
+    /// Messages floating above the application content, oldest first.
+    toasts: Vec<ui::ToastEntry>,
+    /// Identifies each toast so its timers only affect their own entry.
+    next_toast_id: u64,
     /// Drives the drop zone highlight. Cleared as soon as the drag ends.
-    drag_hover: Option<DragHover>,
+    drag_hover: Option<ui::DragHover>,
     /// Kept for a while after `drag_hover` is cleared so it can fade out.
-    drag_overlay: Option<DragOverlay>,
+    drag_overlay: Option<ui::DragOverlay>,
     drag_transition: u64,
     /// Set between pressing the title bar and actually moving the window, so a
     /// plain click (or a double click) does not start a window drag.
@@ -62,10 +68,12 @@ pub fn init_import(view: Entity<AppView>, app: AsyncApp) {
 impl AppView {
     pub fn new(_cx: &mut Context<Self>) -> Self {
         Self {
-            tabs: Vec::new(),
-            active: None,
+            images: Vec::new(),
+            active_image: None,
+            image_picker_open: false,
             busy: false,
-            error: None,
+            toasts: Vec::new(),
+            next_toast_id: 0,
             drag_hover: None,
             drag_overlay: None,
             drag_transition: 0,
@@ -74,16 +82,48 @@ impl AppView {
             window_subscriptions: Vec::new(),
         }
     }
+
+    /// Commits any in-progress numeric edit in the active image's panel.
+    fn commit_active_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(index) = self.active_image {
+            if let Some(panel) = self.images.get(index).map(|tab| tab.panel.clone()) {
+                panel.update(cx, |panel, cx| panel.commit(window, cx));
+            }
+        }
+    }
+
+    /// Opens the settings view of the active image without closing any
+    /// computation tab.
+    fn show_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.commit_active_settings(window, cx);
+        if let Some(tab) = self
+            .active_image
+            .and_then(|index| self.images.get_mut(index))
+        {
+            tab.active = None;
+        }
+        cx.notify();
+    }
+
+    fn select_image(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
+        self.commit_active_settings(window, cx);
+        if index < self.images.len() {
+            self.active_image = Some(index);
+            self.image_picker_open = false;
+        }
+        cx.notify();
+    }
 }
 
 impl Render for AppView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let active = self.active.and_then(|index| self.tabs.get(index));
-        let content = match active {
-            Some(tab) => self.workspace(tab, window, cx).into_any_element(),
+        let content = match self.active_image {
+            Some(_) => self.workspace(window, cx).into_any_element(),
             None => self.import_screen(window, cx).into_any_element(),
         };
         let drag_overlay = self.drag_overlay.clone();
+        let picker_open = self.image_picker_open;
+        let toasts = self.toasts.clone();
 
         let root = div()
             .id("app")
@@ -93,8 +133,17 @@ impl Render for AppView {
             .text_color(rgb(ui::TEXT))
             .child(content)
             .children(ui::title_bar::resize_handles(window))
+            .when(picker_open, |root| root.child(self.image_picker(cx)))
             .when_some(drag_overlay, |root, overlay| {
                 root.child(ui::drag_overlay(overlay))
+            })
+            .when(!toasts.is_empty(), |root| {
+                root.child(ui::toast_layer(toasts.into_iter().map(|entry| {
+                    let id = entry.id;
+                    ui::toast_card(&entry)
+                        .on_click(cx.listener(move |this, _, _, cx| this.dismiss_toast(id, cx)))
+                        .into_any_element()
+                })))
             });
 
         import::sources::attach_drop(root, cx)
