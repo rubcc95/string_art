@@ -11,8 +11,6 @@ mod exec;
 mod import;
 mod ui;
 
-use std::borrow::Cow;
-
 use gpui::{
     App, AppContext as _, Bounds, TitlebarOptions, WindowBounds, WindowDecorations, WindowOptions,
     point, px, size,
@@ -21,12 +19,6 @@ use gpui_platform::application;
 
 fn run() {
     application().run(|cx: &mut App| {
-        cx.text_system()
-            .add_fonts(vec![Cow::Borrowed(include_bytes!(
-                "../assets/fonts/IBMPlexSans-Regular.ttf"
-            ))])
-            .expect("failed to load application fonts");
-
         let restore_bounds = Bounds::centered(None, size(px(1280.), px(800.)), cx);
         let view = cx.new(app::AppView::new);
         let window_view = view.clone();
