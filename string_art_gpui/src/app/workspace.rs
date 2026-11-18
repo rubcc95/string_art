@@ -26,6 +26,8 @@ pub(crate) struct Workspace {
     ellipse: EllipseState,
     panel: Entity<SettingsPanel>,
     _settings_subscription: Subscription,
+    /// Repaints this workspace when the start button gains or loses focus.
+    start_focus_subscriptions: Vec<Subscription>,
     computations: Vec<ComputationTab>,
     /// `None` shows the settings view. Computations are selected by index.
     active: Option<usize>,
@@ -57,6 +59,7 @@ impl Workspace {
             ellipse: EllipseState::default(),
             panel,
             _settings_subscription: subscription,
+            start_focus_subscriptions: Vec::new(),
             computations: Vec::new(),
             active: None,
         }

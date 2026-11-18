@@ -44,6 +44,7 @@ pub struct NumberInput {
     decimals: u8,
     suffix: SharedString,
     blur_subscription: Option<Subscription>,
+    focus_subscription: Option<Subscription>,
 }
 
 impl EventEmitter<NumberInputEvent> for NumberInput {}
@@ -52,7 +53,7 @@ impl NumberInput {
     pub fn new(value: f64, options: NumberInputOptions, cx: &mut Context<Self>) -> Self {
         let value = normalize(value, options.min, options.max, options.decimals);
         Self {
-            focus_handle: cx.focus_handle(),
+            focus_handle: cx.focus_handle().tab_stop(true),
             value,
             text: format_value(value, options.decimals),
             editing: false,
@@ -66,6 +67,7 @@ impl NumberInput {
             decimals: options.decimals,
             suffix: options.suffix,
             blur_subscription: None,
+            focus_subscription: None,
         }
     }
 
@@ -130,6 +132,10 @@ impl NumberInput {
             self.blur_subscription =
                 Some(cx.on_blur(&self.focus_handle, window, |this, window, cx| {
                     this.commit(window, cx);
+                    // Focus listeners run at the end of the frame, when
+                    // `notify` is ignored. Deferring it guarantees a repaint
+                    // without waiting for the next mouse event.
+                    cx.defer_in(window, |_, _, cx| cx.notify());
                 }));
         }
         if self.editing {
@@ -149,11 +155,26 @@ impl NumberInput {
     }
 
     fn handle_key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        let key = event.keystroke.key.as_str();
+        let modifiers = event.keystroke.modifiers;
+
+        // Tab navigates between fields even when none of them is being edited,
+        // so it is handled before the editing guard. Committing here keeps the
+        // typed value before the focus moves to the next control.
+        if key == "tab" {
+            self.commit(window, cx);
+            if modifiers.shift {
+                window.focus_prev(cx);
+            } else {
+                window.focus_next(cx);
+            }
+            cx.stop_propagation();
+            return;
+        }
+
         if !self.editing {
             return;
         }
-        let key = event.keystroke.key.as_str();
-        let modifiers = event.keystroke.modifiers;
         let shortcut = modifiers.platform || modifiers.control;
         let cursor = self.cursor_offset();
         let text_len = self.text.len();
@@ -548,6 +569,20 @@ impl Focusable for NumberInput {
 
 impl Render for NumberInput {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // Keyboard navigation moves focus into this field without a click, so
+        // entering edit mode cannot depend on `begin_edit`'s mouse handler.
+        // The listener needs a window, hence it is registered on first render.
+        if self.focus_subscription.is_none() {
+            let focus_handle = self.focus_handle.clone();
+            self.focus_subscription =
+                Some(cx.on_focus(&focus_handle, window, |this, window, cx| {
+                    this.begin_edit(window, cx);
+                    // See the blur listener: a notify during the focus phase is
+                    // dropped, so schedule it for after the frame.
+                    cx.defer_in(window, |_, _, cx| cx.notify());
+                }));
+        }
+
         let editing = self.editing;
         let focused = self.focus_handle.is_focused(window);
         let suffix = self.suffix.clone();
@@ -573,13 +608,10 @@ impl Render for NumberInput {
                 gpui::MouseButton::Left,
                 cx.listener(|this, _, window, cx| this.begin_edit(window, cx)),
             )
-            .when(editing, |number_box| {
-                number_box
-                    .track_focus(&self.focus_handle)
-                    .on_key_down(cx.listener(|this, event, window, cx| {
-                        this.handle_key(event, window, cx);
-                    }))
-            })
+            .track_focus(&self.focus_handle)
+            .on_key_down(cx.listener(|this, event, window, cx| {
+                this.handle_key(event, window, cx);
+            }))
             .child(if editing {
                 NumberInputElement::new(cx.entity()).into_any_element()
             } else {

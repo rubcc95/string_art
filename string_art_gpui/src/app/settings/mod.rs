@@ -4,7 +4,9 @@ mod model;
 
 pub(super) use model::{SettingField, Settings};
 
-use gpui::{Context, Entity, EventEmitter, Render, Subscription, Window, div, prelude::*};
+use gpui::{
+    Context, Entity, EventEmitter, FocusHandle, Render, Subscription, Window, div, prelude::*,
+};
 
 use crate::ui::{SliderField, SliderFieldEvent};
 
@@ -16,6 +18,10 @@ pub(super) enum SettingsPanelEvent {
 pub(super) struct SettingsPanel {
     settings: Settings,
     fields: Vec<(SettingField, Entity<SliderField>)>,
+    /// Focus handle of the workspace's start button. It follows the numeric
+    /// fields in the tab order and is owned here so the button can be rendered
+    /// outside the panel.
+    start_focus: FocusHandle,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -52,12 +58,19 @@ impl SettingsPanel {
         Self {
             settings,
             fields,
+            // Tab stops without an explicit index default to 0, so index 1
+            // places the button after every numeric field.
+            start_focus: cx.focus_handle().tab_stop(true).tab_index(1),
             _subscriptions: subscriptions,
         }
     }
 
     pub fn settings(&self) -> Settings {
         self.settings
+    }
+
+    pub fn start_focus(&self) -> FocusHandle {
+        self.start_focus.clone()
     }
 
     #[allow(dead_code)]

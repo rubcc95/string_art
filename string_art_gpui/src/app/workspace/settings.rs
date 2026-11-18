@@ -1,6 +1,8 @@
 //! Settings screen of one workspace: preview, form and start button.
 
-use gpui::{AnyElement, Context, ObjectFit, Window, div, img, prelude::*, px, rgb, size};
+use gpui::{
+    AnyElement, Context, KeyDownEvent, ObjectFit, Window, div, img, prelude::*, px, rgb, size,
+};
 
 use crate::ui;
 
@@ -10,9 +12,27 @@ impl Workspace {
     pub(super) fn settings_view(
         &mut self,
         split: bool,
-        _window: &mut Window,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        if self.start_focus_subscriptions.is_empty() {
+            let start_focus = self.panel.read(cx).start_focus();
+            self.start_focus_subscriptions.push(cx.on_focus(
+                &start_focus,
+                window,
+                |_, window, cx| {
+                    cx.defer_in(window, |_, _, cx| cx.notify());
+                },
+            ));
+            self.start_focus_subscriptions.push(cx.on_blur(
+                &start_focus,
+                window,
+                |_, window, cx| {
+                    cx.defer_in(window, |_, _, cx| cx.notify());
+                },
+            ));
+        }
+
         let preview_size = self.image.preview.size(0);
         let image_size = size(px(self.image.width as f32), px(self.image.height as f32));
         let on_pointer = cx.listener(|workspace, event: &ui::EllipsePointerEvent, _window, cx| {
@@ -83,6 +103,7 @@ impl Workspace {
         let name = self.image.name.clone();
         let dimensions = format!("{} × {} px", self.image.width, self.image.height);
         let panel = self.panel.clone();
+        let start_focus = self.panel.read(cx).start_focus();
 
         div()
             .w_full()
@@ -105,19 +126,32 @@ impl Workspace {
             )
             .child(panel)
             .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .gap_2()
-                    .child(
-                        ui::primary_button("start-computation", "Start", true)
-                            .w_full()
-                            .on_click(
-                                cx.listener(|workspace, _, window, cx| {
+                div().flex().flex_col().gap_2().child(
+                    ui::primary_button("start-computation", "Start", true)
+                        .w_full()
+                        .track_focus(&start_focus)
+                        .focus(|style| style.bg(rgb(ui::ACCENT_HOVER)))
+                        .on_key_down(cx.listener(|workspace, event: &KeyDownEvent, window, cx| {
+                            match event.keystroke.key.as_str() {
+                                "enter" => {
                                     workspace.start_computation(window, cx);
-                                }),
-                            ),
-                    ),
+                                    cx.stop_propagation();
+                                }
+                                "tab" => {
+                                    if event.keystroke.modifiers.shift {
+                                        window.focus_prev(cx);
+                                    } else {
+                                        window.focus_next(cx);
+                                    }
+                                    cx.stop_propagation();
+                                }
+                                _ => {}
+                            }
+                        }))
+                        .on_click(cx.listener(|workspace, _, window, cx| {
+                            workspace.start_computation(window, cx);
+                        })),
+                ),
             )
     }
 
