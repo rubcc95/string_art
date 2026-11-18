@@ -10,8 +10,8 @@ use crate::import::{ImportError, ImportedImage, decode};
 use crate::ui;
 use crate::ui::{DragHover, DragOverlay, Toast};
 
-use super::settings::{Settings, SettingsPanel, SettingsPanelEvent};
-use super::{AppView, ImageTab};
+use super::AppView;
+use super::workspace::{Workspace, WorkspaceEvent};
 
 impl AppView {
     fn begin_import(&mut self, cx: &mut Context<Self>) -> bool {
@@ -31,24 +31,12 @@ impl AppView {
         self.busy = false;
         match result {
             Ok(image) => {
-                let settings = Settings::default();
-                let panel = cx.new(|cx| SettingsPanel::new(settings, cx));
-                let subscription = cx.subscribe(&panel, |this, source, event, cx| {
-                    let SettingsPanelEvent::Changed(settings) = *event;
-                    if let Some(tab) = this.images.iter_mut().find(|tab| tab.panel == source) {
-                        tab.settings = settings;
-                        cx.notify();
-                    }
-                });
-                self.images.push(ImageTab {
-                    image,
-                    settings,
-                    panel,
-                    _settings_subscription: subscription,
-                    computations: Vec::new(),
-                    active: None,
-                });
-                self.active_image = Some(self.images.len() - 1);
+                let workspace = cx.new(|cx| Workspace::new(image, cx));
+                let subscription =
+                    cx.subscribe(&workspace, |_, _, _: &WorkspaceEvent, cx| cx.notify());
+                self.workspaces.push(workspace);
+                self._workspace_subscriptions.push(subscription);
+                self.active_workspace = Some(self.workspaces.len() - 1);
             }
             Err(error) => {
                 self.toast(Toast::error("Import failed", Some(error.to_string())), cx);

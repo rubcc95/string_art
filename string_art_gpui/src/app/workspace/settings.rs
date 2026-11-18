@@ -1,37 +1,42 @@
-//! Settings screen composition: preview, header, panel and start button.
+//! Settings screen of one workspace: preview, form and start button.
 
-use gpui::{div, img, prelude::*, px, rgb, size, AnyElement, Context, ObjectFit, Window};
+use gpui::{AnyElement, Context, ObjectFit, Window, div, img, prelude::*, px, rgb, size};
 
 use crate::ui;
 
-use crate::app::{AppView, ComputationTab, ImageTab};
+use super::Workspace;
 
-impl AppView {
-    /// The settings view. It has no tab of its own: it is the landing view of
-    /// an image and is shown whenever no computation tab is active.
-    pub(in crate::app) fn settings_view(
-        &self,
-        index: usize,
-        tab: &ImageTab,
+impl Workspace {
+    pub(super) fn settings_view(
+        &mut self,
         split: bool,
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let preview_size = tab.image.preview.size(0);
+        let preview_size = self.image.preview.size(0);
+        let image_size = size(px(self.image.width as f32), px(self.image.height as f32));
+        let on_pointer = cx.listener(|workspace, event: &ui::EllipsePointerEvent, _window, cx| {
+            if workspace.ellipse.pointer(event) {
+                cx.notify();
+            }
+        });
         let preview = ui::preview_card(
-            img(tab.image.preview.clone())
+            img(self.image.preview.clone())
                 .size_full()
                 .object_fit(ObjectFit::Contain),
             ui::ellipse_overlay(
                 preview_size,
-                size(px(tab.image.width as f32), px(tab.image.height as f32)),
-                ui::EllipseFrame::FULL,
-                tab.settings.nail_count,
-                tab.settings.nail_radius_px,
+                image_size,
+                self.ellipse.frame,
+                self.ellipse.hover,
+                self.ellipse.arrows_seen,
+                self.settings.nail_count,
+                self.settings.nail_radius_px,
+                on_pointer,
             ),
             !split,
         );
-        let form = self.settings_form(index, tab, cx);
+        let form = self.settings_form(cx);
 
         if split {
             div()
@@ -74,15 +79,10 @@ impl AppView {
         }
     }
 
-    fn settings_form(
-        &self,
-        index: usize,
-        tab: &ImageTab,
-        cx: &mut Context<Self>,
-    ) -> impl IntoElement {
-        let name = tab.image.name.clone();
-        let dimensions = format!("{} × {} px", tab.image.width, tab.image.height);
-        let panel = tab.panel.clone();
+    fn settings_form(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let name = self.image.name.clone();
+        let dimensions = format!("{} × {} px", self.image.width, self.image.height);
+        let panel = self.panel.clone();
 
         div()
             .w_full()
@@ -112,38 +112,29 @@ impl AppView {
                     .child(
                         ui::primary_button("start-computation", "Start", true)
                             .w_full()
-                            .on_click(cx.listener(move |this, _, window, cx| {
-                                this.start_computation(index, window, cx);
-                            })),
+                            .on_click(
+                                cx.listener(|workspace, _, window, cx| {
+                                    workspace.start_computation(window, cx);
+                                }),
+                            ),
                     ),
             )
     }
 
-    /// Starts a computation from the current settings and selects its tab.
-    pub(in crate::app) fn start_computation(
+    pub(super) fn start_computation(
         &mut self,
-        index: usize,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if let Some(panel) = self.images.get(index).map(|tab| tab.panel.clone()) {
-            panel.update(cx, |panel, cx| panel.commit(window, cx));
-        }
-
-        let settings = self
-            .images
-            .get(index)
-            .map(|tab| tab.panel.read(cx).settings())
-            .unwrap_or_default();
-
-        if let Some(tab) = self.images.get_mut(index) {
-            let number = tab.computations.len() + 1;
-            tab.computations.push(ComputationTab {
-                name: format!("Computation {number}"),
-                settings,
-            });
-            tab.active = Some(number - 1);
-        }
+        self.commit_settings(window, cx);
+        let settings = self.panel.read(cx).settings();
+        let number = self.computations.len() + 1;
+        self.computations.push(super::ComputationTab {
+            name: format!("Computation {number}"),
+            settings,
+        });
+        self.active = Some(number - 1);
+        cx.emit(super::WorkspaceEvent::ComputationCreated);
         cx.notify();
     }
 }

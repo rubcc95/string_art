@@ -1,10 +1,11 @@
 //! Image sidebar, compact switcher and mobile picker.
 
-use gpui::{Context, ObjectFit, Window, div, img, prelude::*, px, rgb};
+use gpui::{Context, Entity, ObjectFit, Window, div, img, prelude::*, px, rgb};
 
 use crate::ui;
 
-use super::{AppView, ImageTab};
+use super::AppView;
+use super::workspace::Workspace;
 
 impl AppView {
     pub(super) fn image_sidebar(
@@ -15,26 +16,30 @@ impl AppView {
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
         let items = self
-            .images
+            .workspaces
             .iter()
             .enumerate()
-            .map(|(index, tab)| ui::ListItem {
-                leading: img(tab.image.preview.clone())
-                    .size(px(32.))
-                    .rounded_md()
-                    .object_fit(ObjectFit::Cover)
-                    .into_any_element(),
-                title: tab.image.name.clone().into(),
-                subtitle: None,
-                trailing: Some(
-                    div()
-                        .text_xs()
-                        .text_color(rgb(ui::FAINT))
-                        .child(tab.computations.len().to_string())
+            .map(|(index, workspace)| {
+                let workspace = workspace.read(cx);
+                let image = workspace.image();
+                ui::ListItem {
+                    leading: img(image.preview.clone())
+                        .size(px(32.))
+                        .rounded_md()
+                        .object_fit(ObjectFit::Cover)
                         .into_any_element(),
-                ),
-                active: index == active,
-                height: px(44.),
+                    title: image.name.clone().into(),
+                    subtitle: None,
+                    trailing: Some(
+                        div()
+                            .text_xs()
+                            .text_color(rgb(ui::FAINT))
+                            .child(workspace.computation_count().to_string())
+                            .into_any_element(),
+                    ),
+                    active: index == active,
+                    height: px(44.),
+                }
             })
             .collect::<Vec<_>>();
 
@@ -61,17 +66,23 @@ impl AppView {
 
     pub(super) fn image_switcher(
         &self,
-        tab: &ImageTab,
+        workspace: &Entity<Workspace>,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
+        let (preview, name) = {
+            let workspace = workspace.read(cx);
+            let image = workspace.image();
+            (image.preview.clone(), image.name.clone())
+        };
+
         ui::switcher_button(
             "image-switcher",
-            img(tab.image.preview.clone())
+            img(preview)
                 .size(px(22.))
                 .rounded_sm()
                 .object_fit(ObjectFit::Cover)
                 .into_any_element(),
-            tab.image.name.clone(),
+            name,
             cx.listener(|this, _, window, cx| {
                 this.commit_active_settings(window, cx);
                 this.image_picker_open = !this.image_picker_open;
@@ -81,25 +92,27 @@ impl AppView {
     }
 
     pub(super) fn image_picker(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let active = self.active_image;
+        let active = self.active_workspace;
         let rows = self
-            .images
+            .workspaces
             .iter()
             .enumerate()
-            .map(|(index, tab)| {
+            .map(|(index, workspace)| {
+                let workspace = workspace.read(cx);
+                let image = workspace.image();
                 let item = ui::ListItem {
-                    leading: img(tab.image.preview.clone())
+                    leading: img(image.preview.clone())
                         .size(px(38.))
                         .rounded_md()
                         .object_fit(ObjectFit::Cover)
                         .into_any_element(),
-                    title: tab.image.name.clone().into(),
+                    title: image.name.clone().into(),
                     subtitle: Some(
                         format!(
                             "{} × {} px · {} computaciones",
-                            tab.image.width,
-                            tab.image.height,
-                            tab.computations.len()
+                            image.width,
+                            image.height,
+                            workspace.computation_count()
                         )
                         .into(),
                     ),

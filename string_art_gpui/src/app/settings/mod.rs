@@ -1,7 +1,6 @@
 //! Per-image settings panel and its model.
 
 mod model;
-mod view;
 
 pub(super) use model::{SettingField, Settings};
 

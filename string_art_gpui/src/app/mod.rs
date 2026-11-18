@@ -4,43 +4,20 @@ mod chrome;
 mod import;
 mod settings;
 mod sidebar;
-mod tabs;
 mod toast;
 mod workspace;
 
 use gpui::{AsyncApp, Context, Entity, Render, Subscription, Window, div, prelude::*, rgb};
 
-use crate::import::ImportedImage;
 use crate::ui;
 
-use settings::{Settings, SettingsPanel};
-
-/// One imported image and everything derived from it.
-struct ImageTab {
-    image: ImportedImage,
-    /// The settings currently being edited for this image. Computations keep
-    /// their own frozen copy so editing these does not alter them.
-    settings: Settings,
-    /// The editor that owns the numeric fields and sliders.
-    panel: Entity<SettingsPanel>,
-    /// Keeps the panel -> model subscription alive for as long as the tab.
-    _settings_subscription: Subscription,
-    computations: Vec<ComputationTab>,
-    /// `None` shows the settings view. Computations are selected by index.
-    active: Option<usize>,
-}
-
-/// One computation started from an image's settings.
-struct ComputationTab {
-    name: String,
-    /// The settings the computation was started with.
-    #[allow(dead_code)] // Used once computations actually run.
-    settings: Settings,
-}
+use workspace::Workspace;
 
 pub struct AppView {
-    images: Vec<ImageTab>,
-    active_image: Option<usize>,
+    workspaces: Vec<Entity<Workspace>>,
+    active_workspace: Option<usize>,
+    /// Keeps the workspace -> shell subscriptions alive.
+    _workspace_subscriptions: Vec<Subscription>,
     /// Whether the compact image picker sheet is open.
     image_picker_open: bool,
     busy: bool,
@@ -72,8 +49,9 @@ pub fn init_import(view: Entity<AppView>, app: AsyncApp) {
 impl AppView {
     pub fn new(_cx: &mut Context<Self>) -> Self {
         Self {
-            images: Vec::new(),
-            active_image: None,
+            workspaces: Vec::new(),
+            active_workspace: None,
+            _workspace_subscriptions: Vec::new(),
             image_picker_open: false,
             busy: false,
             picker_pending: false,
@@ -88,32 +66,22 @@ impl AppView {
         }
     }
 
-    /// Commits any in-progress numeric edit in the active image's panel.
+    /// Commits any in-progress numeric edit in the active workspace.
     fn commit_active_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(index) = self.active_image {
-            if let Some(panel) = self.images.get(index).map(|tab| tab.panel.clone()) {
-                panel.update(cx, |panel, cx| panel.commit(window, cx));
-            }
-        }
-    }
-
-    /// Opens the settings view of the active image without closing any
-    /// computation tab.
-    fn show_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.commit_active_settings(window, cx);
-        if let Some(tab) = self
-            .active_image
-            .and_then(|index| self.images.get_mut(index))
-        {
-            tab.active = None;
-        }
-        cx.notify();
+        let Some(workspace) = self
+            .active_workspace
+            .and_then(|index| self.workspaces.get(index))
+            .cloned()
+        else {
+            return;
+        };
+        workspace.update(cx, |workspace, cx| workspace.commit_settings(window, cx));
     }
 
     fn select_image(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         self.commit_active_settings(window, cx);
-        if index < self.images.len() {
-            self.active_image = Some(index);
+        if index < self.workspaces.len() {
+            self.active_workspace = Some(index);
             self.image_picker_open = false;
         }
         cx.notify();
@@ -122,7 +90,7 @@ impl AppView {
 
 impl Render for AppView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let content = match self.active_image {
+        let content = match self.active_workspace {
             Some(_) => self.workspace(window, cx).into_any_element(),
             None => self.import_screen(window, cx).into_any_element(),
         };
