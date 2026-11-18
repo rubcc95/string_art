@@ -17,10 +17,17 @@ impl AppView {
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        let preview_size = tab.image.preview.size(0);
         let preview = ui::preview_card(
-            img(tab.image.preview.clone())
+            div()
+                .relative()
                 .size_full()
-                .object_fit(ObjectFit::Contain),
+                .child(
+                    img(tab.image.preview.clone())
+                        .size_full()
+                        .object_fit(ObjectFit::Contain),
+                )
+                .child(ui::ellipse_overlay(preview_size)),
             !split,
         );
         let form = self.settings_form(index, tab, cx);

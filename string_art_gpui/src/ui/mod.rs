@@ -7,6 +7,7 @@ use gpui::{Pixels, px};
 mod bottom_sheet;
 mod button;
 mod drag_overlay;
+mod ellipse_overlay;
 mod empty_state;
 mod number_input;
 mod preview;
@@ -21,6 +22,7 @@ pub mod title_bar;
 pub use bottom_sheet::bottom_sheet;
 pub use button::{icon_button, primary_button, secondary_button};
 pub use drag_overlay::{DragHover, DragOverlay, drag_overlay};
+pub use ellipse_overlay::ellipse_overlay;
 pub use empty_state::empty_state;
 pub use preview::preview_card;
 pub use sidebar::{ListItem, list_item, sidebar, sidebar_import_button};
@@ -50,6 +52,8 @@ pub const ERROR_BG: u32 = 0x2a1517;
 pub const ERROR_BORDER: u32 = 0x7f2d34;
 pub const ERROR_TEXT: u32 = 0xf4a3a7;
 pub const PREVIEW_BG: u32 = 0x0f0f12;
+/// Darkens the part of the preview the computation does not draw.
+pub const PREVIEW_MASK: u32 = 0x0f0f12cc;
 
 /// Below this width the image sidebar is replaced by the title-bar picker.
 pub const MOBILE_MAX_WIDTH: Pixels = px(720.);
