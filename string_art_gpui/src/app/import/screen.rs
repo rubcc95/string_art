@@ -13,6 +13,7 @@ impl AppView {
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
         let busy = self.busy;
+        let picker_enabled = !busy && !self.picker_pending;
         let drag_accepted = matches!(self.drag_hover, Some(DragHover::Accepted { .. }));
         let drag_rejected = matches!(self.drag_hover, Some(DragHover::Rejected { .. }));
 
@@ -77,14 +78,21 @@ impl AppView {
                                     )
                                     .child(div().text_sm().text_color(rgb(ui::MUTED)).child("or"))
                                     .child(
-                                        ui::primary_button("import-image", button_label, !busy)
-                                            .when(!busy, |button| {
+                                        ui::primary_button(
+                                            "import-image",
+                                            button_label,
+                                            picker_enabled,
+                                        )
+                                        .when(
+                                            picker_enabled,
+                                            |button| {
                                                 button.on_click(cx.listener(
                                                     |this, _, window, cx| {
                                                         this.pick_image(window, cx)
                                                     },
                                                 ))
-                                            }),
+                                            },
+                                        ),
                                     )
                                     .child(
                                         div()

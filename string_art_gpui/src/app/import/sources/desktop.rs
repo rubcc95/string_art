@@ -16,7 +16,7 @@ use crate::ui::DragHover;
 pub fn init(_view: Entity<AppView>, _app: AsyncApp) {}
 
 /// Opens the native file picker, filtered to the supported image extensions.
-pub fn pick(window: &mut Window, cx: &mut Context<AppView>) {
+pub fn pick(window: &mut Window, cx: &mut Context<AppView>) -> bool {
     let dialog = rfd::AsyncFileDialog::new()
         .add_filter("Images", import::SUPPORTED_EXTENSIONS)
         .set_title("Select an image")
@@ -24,7 +24,9 @@ pub fn pick(window: &mut Window, cx: &mut Context<AppView>) {
         .pick_file();
 
     cx.spawn(async move |this, cx| {
-        let Some(file) = dialog.await else {
+        let file = dialog.await;
+        let _ = this.update(cx, |this, cx| this.picker_closed(cx));
+        let Some(file) = file else {
             return;
         };
         let path = file.path().to_path_buf();
@@ -38,6 +40,8 @@ pub fn pick(window: &mut Window, cx: &mut Context<AppView>) {
         read_and_send(path, this, cx).await;
     })
     .detach();
+
+    true
 }
 
 /// Adds the drag feedback and the file-drop handler to the application root.

@@ -137,10 +137,10 @@ pub fn sidebar(
 
 /// A compact import button for the sidebar footer. The caller attaches its
 /// click handler.
-pub fn sidebar_import_button(compact: bool) -> Stateful<Div> {
+pub fn sidebar_import_button(compact: bool, enabled: bool) -> Stateful<Div> {
     if compact {
-        super::icon_button("sidebar-import", "+", true).mx_auto()
+        super::icon_button("sidebar-import", "+", enabled).mx_auto()
     } else {
-        super::secondary_button("sidebar-import", "+  Importar imagen", true).w_full()
+        super::secondary_button("sidebar-import", "+  Importar imagen", enabled).w_full()
     }
 }

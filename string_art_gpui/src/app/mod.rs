@@ -44,6 +44,10 @@ pub struct AppView {
     /// Whether the compact image picker sheet is open.
     image_picker_open: bool,
     busy: bool,
+    /// Whether a file picker was opened and has not reported back yet. Avoids
+    /// stacking dialogs when the picker button is pressed several times before
+    /// the first one shows up.
+    picker_pending: bool,
     /// Messages floating above the application content, oldest first.
     toasts: Vec<ui::ToastEntry>,
     /// Identifies each toast so its timers only affect their own entry.
@@ -72,6 +76,7 @@ impl AppView {
             active_image: None,
             image_picker_open: false,
             busy: false,
+            picker_pending: false,
             toasts: Vec::new(),
             next_toast_id: 0,
             drag_hover: None,

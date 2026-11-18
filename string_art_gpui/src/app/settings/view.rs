@@ -1,6 +1,6 @@
 //! Settings screen composition: preview, header, panel and start button.
 
-use gpui::{AnyElement, Context, ObjectFit, Window, div, img, prelude::*, px, rgb};
+use gpui::{div, img, prelude::*, px, rgb, size, AnyElement, Context, ObjectFit, Window};
 
 use crate::ui;
 
@@ -19,15 +19,16 @@ impl AppView {
     ) -> AnyElement {
         let preview_size = tab.image.preview.size(0);
         let preview = ui::preview_card(
-            div()
-                .relative()
+            img(tab.image.preview.clone())
                 .size_full()
-                .child(
-                    img(tab.image.preview.clone())
-                        .size_full()
-                        .object_fit(ObjectFit::Contain),
-                )
-                .child(ui::ellipse_overlay(preview_size)),
+                .object_fit(ObjectFit::Contain),
+            ui::ellipse_overlay(
+                preview_size,
+                size(px(tab.image.width as f32), px(tab.image.height as f32)),
+                ui::EllipseFrame::FULL,
+                tab.settings.nail_count,
+                tab.settings.nail_radius_px,
+            ),
             !split,
         );
         let form = self.settings_form(index, tab, cx);
@@ -97,7 +98,7 @@ impl AppView {
                         div()
                             .text_lg()
                             .text_color(rgb(ui::TEXT))
-                            .child("Configuración"),
+                            .child("Configuration"),
                     )
                     .child(div().text_sm().text_color(rgb(ui::TEXT)).child(name))
                     .child(div().text_xs().text_color(rgb(ui::MUTED)).child(dimensions)),
@@ -109,12 +110,7 @@ impl AppView {
                     .flex_col()
                     .gap_2()
                     .child(
-                        div().text_xs().text_color(rgb(ui::FAINT)).child(
-                            "La resolución y el resto de parámetros se configurarán después.",
-                        ),
-                    )
-                    .child(
-                        ui::primary_button("start-computation", "Iniciar computación", true)
+                        ui::primary_button("start-computation", "Start", true)
                             .w_full()
                             .on_click(cx.listener(move |this, _, window, cx| {
                                 this.start_computation(index, window, cx);
@@ -143,7 +139,7 @@ impl AppView {
         if let Some(tab) = self.images.get_mut(index) {
             let number = tab.computations.len() + 1;
             tab.computations.push(ComputationTab {
-                name: format!("Computación {number}"),
+                name: format!("Computation {number}"),
                 settings,
             });
             tab.active = Some(number - 1);

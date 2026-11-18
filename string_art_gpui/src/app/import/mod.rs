@@ -142,10 +142,26 @@ impl AppView {
     }
 
     pub fn pick_image(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.busy {
+        if self.busy || self.picker_pending {
             return;
         }
-        sources::pick(window, cx);
+        // Mark it before opening: the native dialog is async, and it could
+        // theoretically report back before `pick` returns.
+        self.picker_pending = true;
+        cx.notify();
+        if !sources::pick(window, cx) {
+            self.picker_pending = false;
+            cx.notify();
+        }
+    }
+
+    /// Marks the pending file picker as finished, whether a file was chosen or
+    /// the dialog was cancelled.
+    pub fn picker_closed(&mut self, cx: &mut Context<Self>) {
+        if self.picker_pending {
+            self.picker_pending = false;
+            cx.notify();
+        }
     }
 
     /// Reports an import failure without leaving the import UI in a busy state.

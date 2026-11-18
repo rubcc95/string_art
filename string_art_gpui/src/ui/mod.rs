@@ -22,7 +22,7 @@ pub mod title_bar;
 pub use bottom_sheet::bottom_sheet;
 pub use button::{icon_button, primary_button, secondary_button};
 pub use drag_overlay::{DragHover, DragOverlay, drag_overlay};
-pub use ellipse_overlay::ellipse_overlay;
+pub use ellipse_overlay::{EllipseFrame, ellipse_overlay};
 pub use empty_state::empty_state;
 pub use preview::preview_card;
 pub use sidebar::{ListItem, list_item, sidebar, sidebar_import_button};

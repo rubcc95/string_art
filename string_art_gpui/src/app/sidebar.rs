@@ -38,7 +38,7 @@ impl AppView {
             })
             .collect::<Vec<_>>();
 
-        let footer = ui::sidebar_import_button(rail)
+        let footer = ui::sidebar_import_button(rail, !self.busy && !self.picker_pending)
             .on_click(cx.listener(|this, _, window, cx| this.pick_image(window, cx)))
             .into_any_element();
 
@@ -130,12 +130,16 @@ impl AppView {
             .p_3()
             .pt_0()
             .child(
-                ui::primary_button("picker-import", "Importar imagen", true)
-                    .w_full()
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        this.image_picker_open = false;
-                        this.pick_image(window, cx);
-                    })),
+                ui::primary_button(
+                    "picker-import",
+                    "Importar imagen",
+                    !self.busy && !self.picker_pending,
+                )
+                .w_full()
+                .on_click(cx.listener(|this, _, window, cx| {
+                    this.image_picker_open = false;
+                    this.pick_image(window, cx);
+                })),
             )
             .into_any_element();
 
