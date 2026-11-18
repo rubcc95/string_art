@@ -88,10 +88,31 @@
 
 	#status {
 		margin: 0;
-		min-height: 1.5em;
+		min-height: 3em;
 		font-size: 14px;
 		line-height: 1.5;
 		color: #b4b4b4;
+	}
+
+	#status-text {
+		transition: opacity 160ms ease-out;
+	}
+
+	#status-text.is-fading {
+		opacity: 0;
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		margin: -1px;
+		padding: 0;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		clip-path: inset(50%);
+		white-space: nowrap;
+		border: 0;
 	}
 
 	#percent {
@@ -193,6 +214,10 @@
 			animation: none;
 		}
 
+		#status-text {
+			transition: none;
+		}
+
 		#loading.is-hidden {
 			transition: none;
 		}
@@ -209,7 +234,10 @@
 			</g>
 		</svg>
 		<h1>String Art</h1>
-		<p id="status" role="status">Downloading…</p>
+		<p id="status" role="status">
+			<span id="status-live" class="sr-only">Downloading the application…</span>
+			<span id="status-text" aria-hidden="true">Untangling the thread…</span>
+		</p>
 		<div id="progress" class="progress" role="progressbar" aria-label="Application download" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
 			<span></span>
 		</div>
@@ -227,13 +255,91 @@
 
 	(() => {
 		const loading = document.getElementById("loading");
-		const status = document.getElementById("status");
+		const statusText = document.getElementById("status-text");
+		const statusLive = document.getElementById("status-live");
 		const progress = document.getElementById("progress");
 		const fill = progress.firstElementChild;
 		const percent = document.getElementById("percent");
 		const note = document.getElementById("note");
 		const errorText = document.getElementById("error");
 		const retry = document.getElementById("retry");
+
+		// Whimsical messages shown while the wasm downloads, rotating in a
+		// shuffled order so the sequence does not feel like a short loop.
+		const messages = [
+			"Untangling the thread…",
+			"Hammering the nails…",
+			"Varnishing the board…",
+			"Sorting the spools…",
+			"Threading the needle…",
+			"Measuring twice, nailing once…",
+			"Counting the nails… one, two, many…",
+			"Warming up the hammer…",
+			"Polishing the pins…",
+			"Consulting string theory…",
+			"Asking the loom nicely…",
+			"Tying the first knot…",
+		];
+		const MESSAGE_INTERVAL = 3500;
+		const FADE_MS = 160;
+
+		const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+		let bag = [];
+		let lastMessage = "";
+		let rotationTimer = null;
+		let fadeTimer = null;
+
+		const nextMessage = () => {
+			if (bag.length === 0) {
+				bag = messages.slice();
+				for (let i = bag.length - 1; i > 0; i--) {
+					const j = Math.floor(Math.random() * (i + 1));
+					[bag[i], bag[j]] = [bag[j], bag[i]];
+				}
+				// Avoid showing the same message twice across shuffles.
+				if (bag.length > 1 && bag[bag.length - 1] === lastMessage) {
+					[bag[bag.length - 1], bag[0]] = [bag[0], bag[bag.length - 1]];
+				}
+			}
+			lastMessage = bag.pop();
+			return lastMessage;
+		};
+
+		const renderMessage = (text, animate = true) => {
+			clearTimeout(fadeTimer);
+			fadeTimer = null;
+			if (!animate || reduceMotion.matches) {
+				statusText.textContent = text;
+				statusText.classList.remove("is-fading");
+				return;
+			}
+			statusText.classList.add("is-fading");
+			fadeTimer = setTimeout(() => {
+				fadeTimer = null;
+				statusText.textContent = text;
+				statusText.classList.remove("is-fading");
+			}, FADE_MS);
+		};
+
+		const stopRotation = () => {
+			if (rotationTimer !== null) {
+				clearInterval(rotationTimer);
+				rotationTimer = null;
+			}
+		};
+
+		// Stage changes stop the rotation and only update the text exposed to
+		// assistive tech, so the rotating jokes are not announced constantly.
+		const setStatus = (text, visibleText = text) => {
+			stopRotation();
+			statusLive.textContent = text;
+			renderMessage(visibleText, false);
+		};
+
+		renderMessage(nextMessage(), false);
+		rotationTimer = setInterval(() => {
+			renderMessage(nextMessage());
+		}, MESSAGE_INTERVAL);
 
 		const metaTotal = Number(document.querySelector('meta[name="wasm-bytes"]')?.content) || 0;
 		const wasmUrl = new URL("string_art_gpui_bg.wasm", document.baseURI);
@@ -273,7 +379,7 @@
 
 		const showError = (error) => {
 			console.error(error);
-			status.textContent = "Failed to load the application";
+			setStatus("Failed to load the application");
 			percent.textContent = "";
 			progress.hidden = true;
 			errorText.textContent = error instanceof Error ? error.message : String(error);
@@ -283,7 +389,7 @@
 		};
 
 		const hideLoading = () => {
-			status.textContent = "Ready";
+			setStatus("Ready");
 			loading.style.animation = "none";
 			void loading.offsetWidth;
 			loading.classList.add("is-hidden");
@@ -343,7 +449,7 @@
 			const initialization = init({ module_or_path: withProgress });
 			if (downloadComplete) {
 				downloadComplete.then(() => {
-					status.textContent = "Preparing the interface…";
+					setStatus("Preparing the interface…");
 				});
 			}
 			await initialization;
