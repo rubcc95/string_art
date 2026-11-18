@@ -62,9 +62,12 @@ pub fn init(view: Entity<AppView>, app: AsyncApp) {
     let picker_app = app.clone();
     let input_for_handler = input.clone();
     let handler = Closure::<dyn FnMut(Event)>::new(move |_event: Event| {
-        let files = input_for_handler.files();
+        // Grab the file before clearing the input: Chromium returns the same
+        // live `FileList` object from `files()`, and `set_value("")` empties it
+        // in place, so reading it afterwards yields no file at all.
+        let file = input_for_handler.files().and_then(|files| files.get(0));
         input_for_handler.set_value("");
-        let Some(file) = files.and_then(|files| files.get(0)) else {
+        let Some(file) = file else {
             return;
         };
         read_and_import(file, picker_view.clone(), picker_app.clone());
