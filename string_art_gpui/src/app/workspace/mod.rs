@@ -45,7 +45,8 @@ impl EventEmitter<WorkspaceEvent> for Workspace {}
 
 impl Workspace {
     pub fn new(image: ImportedImage, cx: &mut Context<Self>) -> Self {
-        let settings = Settings::default();
+        let mut settings = Settings::default();
+        settings.set_image_aspect(image.width, image.height);
         let panel = cx.new(|cx| SettingsPanel::new(settings, cx));
         let subscription = cx.subscribe(&panel, |this, _, event, cx| {
             let SettingsPanelEvent::Changed(settings) = *event;

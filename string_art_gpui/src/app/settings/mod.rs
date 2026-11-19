@@ -73,6 +73,27 @@ impl SettingsPanel {
         self.start_focus.clone()
     }
 
+    /// Keeps the physical size in proportion with the ellipse after it has
+    /// been resized. The width stays fixed unless the resulting height leaves
+    /// the accepted range.
+    pub fn set_ellipse_aspect(&mut self, aspect: f64, cx: &mut Context<Self>) {
+        if (f64::from(self.settings.aspect()) - aspect).abs() <= 1e-6 {
+            return;
+        }
+        self.settings.set_ellipse_aspect(aspect);
+        for field in [SettingField::Width, SettingField::Height] {
+            let value = field.value(&self.settings);
+            if let Some((_, slider)) = self
+                .fields
+                .iter()
+                .find(|(candidate, _)| *candidate == field)
+            {
+                slider.update(cx, |slider, cx| slider.set_value(value, cx));
+            }
+        }
+        cx.emit(SettingsPanelEvent::Changed(self.settings));
+    }
+
     #[allow(dead_code)]
     pub fn set_settings(&mut self, settings: Settings, cx: &mut Context<Self>) {
         self.settings = settings;
@@ -112,6 +133,22 @@ impl SettingsPanel {
                 .find(|(candidate, _)| *candidate == field)
             {
                 slider.update(cx, |slider, cx| slider.set_value(applied, cx));
+            }
+        }
+
+        if matches!(field, SettingField::Width | SettingField::Height) {
+            let other = if field == SettingField::Width {
+                SettingField::Height
+            } else {
+                SettingField::Width
+            };
+            let value = other.value(&self.settings);
+            if let Some((_, slider)) = self
+                .fields
+                .iter()
+                .find(|(candidate, _)| *candidate == other)
+            {
+                slider.update(cx, |slider, cx| slider.set_value(value, cx));
             }
         }
 

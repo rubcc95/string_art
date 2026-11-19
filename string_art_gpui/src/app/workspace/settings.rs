@@ -37,6 +37,7 @@ impl Workspace {
         let image_size = size(px(self.image.width as f32), px(self.image.height as f32));
         let on_pointer = cx.listener(|workspace, event: &ui::EllipsePointerEvent, _window, cx| {
             if workspace.ellipse.pointer(event) {
+                workspace.sync_ellipse_aspect(cx);
                 cx.notify();
             }
         });
@@ -97,6 +98,29 @@ impl Workspace {
                 )
                 .into_any_element()
         }
+    }
+
+    /// Copies the aspect ratio of the resized ellipse to the physical size of
+    /// the work, so the drawing is never stretched. Moving the ellipse does
+    /// not change the ratio and therefore does nothing here.
+    fn sync_ellipse_aspect(&mut self, cx: &mut Context<Self>) {
+        let frame = self.ellipse.frame;
+        if frame.width <= 0.
+            || frame.height <= 0.
+            || self.image.width == 0
+            || self.image.height == 0
+        {
+            return;
+        }
+
+        let aspect = (f64::from(frame.height) * f64::from(self.image.height))
+            / (f64::from(frame.width) * f64::from(self.image.width));
+        if (f64::from(self.settings.aspect()) - aspect).abs() <= 1e-5 {
+            return;
+        }
+
+        self.panel
+            .update(cx, |panel, cx| panel.set_ellipse_aspect(aspect, cx));
     }
 
     fn settings_form(&self, cx: &mut Context<Self>) -> impl IntoElement {
