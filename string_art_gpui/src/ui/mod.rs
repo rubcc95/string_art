@@ -6,9 +6,9 @@ use gpui::{Pixels, px};
 
 mod bottom_sheet;
 mod button;
-mod drag_overlay;
 mod ellipse_overlay;
 mod empty_state;
+mod import_overlay;
 mod number_input;
 mod preview;
 mod sidebar;
@@ -21,11 +21,11 @@ pub mod title_bar;
 
 pub use bottom_sheet::bottom_sheet;
 pub use button::{icon_button, primary_button, secondary_button};
-pub use drag_overlay::{DragHover, DragOverlay, drag_overlay};
 pub use ellipse_overlay::{
     EllipseDragKind, EllipseFrame, EllipsePointerEvent, ResizeHandle, ellipse_overlay,
 };
 pub use empty_state::empty_state;
+pub use import_overlay::{DragHover, DragOverlay, import_overlay};
 pub use preview::preview_card;
 pub use sidebar::{ListItem, list_item, sidebar, sidebar_import_button};
 pub use slider_field::{SliderField, SliderFieldEvent};

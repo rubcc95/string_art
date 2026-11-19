@@ -37,7 +37,7 @@ pub struct DragOverlay {
 /// It deliberately does not occlude the mouse: the drop handler lives on the
 /// application root, which would stop being hovered (and therefore stop
 /// receiving `on_drop`) if this overlay blocked its hitbox.
-pub fn drag_overlay(overlay: DragOverlay) -> impl IntoElement {
+pub fn import_overlay(overlay: DragOverlay) -> impl IntoElement {
     let DragOverlay {
         hover,
         leaving,

@@ -109,7 +109,7 @@ impl Render for AppView {
             .children(ui::title_bar::resize_handles(window))
             .when(picker_open, |root| root.child(self.image_picker(cx)))
             .when_some(drag_overlay, |root, overlay| {
-                root.child(ui::drag_overlay(overlay))
+                root.child(ui::import_overlay(overlay))
             })
             .when(!toasts.is_empty(), |root| {
                 root.child(ui::toast_layer(toasts.into_iter().map(|entry| {
