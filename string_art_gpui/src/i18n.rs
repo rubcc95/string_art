@@ -16,17 +16,24 @@ use rust_i18n::t;
 use crate::config::Config;
 
 /// Languages shipped with the application. The first tag is the fallback.
-#[allow(dead_code)]
-pub const SUPPORTED_LOCALES: &[(&str, &str)] = &[("en", "English"), ("es", "Español")];
+pub const SUPPORTED_LOCALES: &[(&str, &str)] = &[
+    ("en", "English"),
+    ("es", "Español"),
+    ("fr", "Français"),
+    ("pt", "Português"),
+    ("it", "Italiano"),
+    ("de", "Deutsch"),
+    ("ca", "Català"),
+    ("gl", "Galego"),
+    ("eu", "Euskara"),
+];
 
 /// Normalizes a BCP 47 tag such as `es-ES` to one of the supported catalogs.
 pub fn normalize_tag(tag: &str) -> Option<&'static str> {
     let language = tag.split(['-', '_']).next()?.to_ascii_lowercase();
-    match language.as_str() {
-        "en" => Some("en"),
-        "es" => Some("es"),
-        _ => None,
-    }
+    SUPPORTED_LOCALES
+        .iter()
+        .find_map(|(code, _)| (*code == language.as_str()).then_some(*code))
 }
 
 /// Chooses the locale to use, in priority order: explicit configuration,
@@ -300,20 +307,31 @@ mod tests {
     #[test]
     fn catalogues_have_the_same_keys_and_placeholders() {
         let en = load_catalog(include_str!("../locales/en.yml"));
-        let es = load_catalog(include_str!("../locales/es.yml"));
+        let catalogues = [
+            ("es", include_str!("../locales/es.yml")),
+            ("fr", include_str!("../locales/fr.yml")),
+            ("pt", include_str!("../locales/pt.yml")),
+            ("it", include_str!("../locales/it.yml")),
+            ("de", include_str!("../locales/de.yml")),
+            ("ca", include_str!("../locales/ca.yml")),
+            ("gl", include_str!("../locales/gl.yml")),
+            ("eu", include_str!("../locales/eu.yml")),
+        ];
 
-        assert_eq!(
-            en.keys().collect::<Vec<_>>(),
-            es.keys().collect::<Vec<_>>(),
-            "both catalogues must define the same keys"
-        );
-        for (key, english) in &en {
-            let spanish = &es[key];
+        for (tag, yaml) in catalogues {
+            let catalogue = load_catalog(yaml);
             assert_eq!(
-                placeholders(english),
-                placeholders(spanish),
-                "placeholders differ for {key}"
+                en.keys().collect::<Vec<_>>(),
+                catalogue.keys().collect::<Vec<_>>(),
+                "{tag} must define the same keys as English"
             );
+            for (key, english) in &en {
+                assert_eq!(
+                    placeholders(english),
+                    placeholders(&catalogue[key]),
+                    "placeholders differ for {key} in {tag}"
+                );
+            }
         }
     }
 
@@ -327,6 +345,18 @@ mod tests {
             rust_i18n::t!("import.choose", locale = "en"),
             "Choose an image"
         );
+        for (locale, close) in [
+            ("fr", "Fermer"),
+            ("pt", "Fechar"),
+            ("it", "Chiudi"),
+            ("de", "Schließen"),
+            ("ca", "Tanca"),
+            ("gl", "Pechar"),
+            ("eu", "Itxi"),
+        ] {
+            assert_eq!(rust_i18n::t!("common.close", locale = locale), close);
+        }
+
         assert_eq!(
             tr_plural_for("en", "sidebar.computations", 1),
             "1 computation"
@@ -343,6 +373,15 @@ mod tests {
             tr_plural_for("es", "sidebar.computations", 2),
             "2 computaciones"
         );
+        // French treats zero as singular.
+        assert_eq!(tr_plural_for("fr", "sidebar.computations", 0), "0 calcul");
+        assert_eq!(tr_plural_for("fr", "sidebar.computations", 2), "2 calculs");
+        assert_eq!(tr_plural_for("pt", "sidebar.computations", 2), "2 cálculos");
+        assert_eq!(
+            tr_plural_for("de", "sidebar.computations", 1),
+            "1 Berechnung"
+        );
+        assert_eq!(tr_plural_for("eu", "sidebar.computations", 2), "2 kalkulu");
     }
 
     #[test]
@@ -350,9 +389,25 @@ mod tests {
         assert_eq!(resolve_locale(Some("es"), Some("en-US")), "es");
         assert_eq!(resolve_locale(Some("es-ES"), Some("en-US")), "es");
         assert_eq!(resolve_locale(None, Some("es-MX")), "es");
-        assert_eq!(resolve_locale(None, Some("fr-FR")), "en");
+        assert_eq!(resolve_locale(None, Some("fr-FR")), "fr");
+        assert_eq!(resolve_locale(None, Some("pt-BR")), "pt");
+        assert_eq!(resolve_locale(Some("ca-ES"), Some("es")), "ca");
+        assert_eq!(resolve_locale(None, Some("de-DE")), "de");
+        assert_eq!(resolve_locale(None, Some("ja-JP")), "en");
         assert_eq!(resolve_locale(Some("xx"), Some("es")), "es");
         assert_eq!(resolve_locale(None, None), "en");
+    }
+
+    #[test]
+    fn normalizes_regional_tags() {
+        assert_eq!(normalize_tag("fr-CA"), Some("fr"));
+        assert_eq!(normalize_tag("pt_BR"), Some("pt"));
+        assert_eq!(normalize_tag("it-IT"), Some("it"));
+        assert_eq!(normalize_tag("de-AT"), Some("de"));
+        assert_eq!(normalize_tag("ca-ES"), Some("ca"));
+        assert_eq!(normalize_tag("gl-ES"), Some("gl"));
+        assert_eq!(normalize_tag("eu-ES"), Some("eu"));
+        assert_eq!(normalize_tag("ja-JP"), None);
     }
 
     #[test]

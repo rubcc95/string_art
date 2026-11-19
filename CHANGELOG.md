@@ -3,9 +3,10 @@
 ## [Unreleased]
 
 ### Added
-- `string_art_gpui`: English and Spanish UI. The language follows the system by
-  default and can be forced with the new `config.json`
-  (`STRING_ART_LANG` overrides it on native builds).
+- `string_art_gpui`: English, Spanish, French, Portuguese, Italian, German,
+  Catalan, Galician and Basque UI. The language follows the system by default
+  and can be forced with the new `config.json` (`STRING_ART_LANG` overrides it
+  on native builds).
 - `string_art_gpui`: locale-aware number formatting and parsing through ICU4X,
   including decimal separators, grouping and plural forms.
 - `string_art_gpui`: `GpuiExec` backend that distributes the sweep over the

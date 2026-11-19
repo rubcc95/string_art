@@ -6,9 +6,9 @@ More detailed instructions on how to use the application will be published in fu
 
 ## Language
 
-The interface is available in English and Spanish. By default it follows the
-system language, falling back to English when the system language is not
-supported.
+The interface is available in English, Spanish, French, Portuguese, Italian,
+German, Catalan, Galician and Basque. By default it follows the system
+language, falling back to English when the system language is not supported.
 
 The preference is stored in:
 
@@ -27,9 +27,11 @@ The file is optional. To force a language, create it with:
 }
 ```
 
-Supported values are `"en"`, `"es"`, or `null`/missing for automatic detection.
-On native builds, the `STRING_ART_LANG` environment variable overrides the file,
-which is useful for tests and screenshots.
+Supported values are `"en"`, `"es"`, `"fr"`, `"pt"`, `"it"`, `"de"`, `"ca"`,
+`"gl"`, `"eu"`, or `null`/missing for automatic detection. Regional tags such
+as `"pt-BR"` or `"ca-ES"` are normalized to their base language. On native
+builds, the `STRING_ART_LANG` environment variable overrides the file, which is
+useful for tests and screenshots.
 
 ## Lastest Version Download Links
 
