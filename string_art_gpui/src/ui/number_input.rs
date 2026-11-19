@@ -5,16 +5,22 @@
 //! restricted to digits and (when configured) a decimal point.
 
 use std::ops::Range;
+use std::sync::Arc;
 
 use gpui::{
     App, Bounds, ClipboardItem, Context, CursorStyle, Element, ElementId, ElementInputHandler,
-    Entity, EntityInputHandler, EventEmitter, FocusHandle, Focusable, GlobalElementId,
+    Entity, EntityInputHandler, EventEmitter, FocusHandle, Focusable, FontFeatures, GlobalElementId,
     InspectorElementId, KeyDownEvent, LayoutId, PaintQuad, Pixels, Point, ShapedLine, SharedString,
     Style, Subscription, TextAlign, TextRun, UTF16Selection, UnderlineStyle, Window, div, fill,
     point, prelude::*, px, relative, rgb, rgba, size,
 };
 
 use super::{ACCENT, BG, BORDER, FAINT, TEXT};
+
+/// OpenType feature list that keeps digits on a fixed advance.
+fn tabular_figures() -> FontFeatures {
+    FontFeatures(Arc::new(vec![("tnum".to_owned(), 1)]))
+}
 
 #[derive(Clone, Debug)]
 pub struct NumberInputOptions {
@@ -618,6 +624,7 @@ impl Render for NumberInput {
                 div()
                     .text_sm()
                     .text_color(rgb(TEXT))
+                    .font_features(tabular_figures())
                     .child(value)
                     .into_any_element()
             })
@@ -692,10 +699,13 @@ impl Element for NumberInputElement {
         let selected_range = input.selected_range.clone();
         let cursor = input.cursor_offset();
         let style = window.text_style();
+        let mut font = style.font();
+        // Tabular figures: the value must not shift while it is being edited.
+        font.features = tabular_figures();
 
         let run = TextRun {
             len: content.len(),
-            font: style.font(),
+            font,
             color: style.color,
             background_color: None,
             underline: None,

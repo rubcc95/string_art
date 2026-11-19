@@ -104,7 +104,7 @@ impl Render for AppView {
             .size_full()
             .bg(rgb(ui::BG))
             .text_color(rgb(ui::TEXT))
-            .font_family(".SystemUIFont")
+            .font_family(ui::FONT_FAMILY)
             .child(content)
             .children(ui::title_bar::resize_handles(window))
             .when(picker_open, |root| root.child(self.image_picker(cx)))

@@ -39,6 +39,9 @@ pub use toast::{
 /// Duration of both the entry and the exit of the drag overlay.
 pub const DRAG_OVERLAY_FADE: Duration = Duration::from_secs(1);
 
+/// UI family registered in `main.rs`. Bundled so desktop and web render alike.
+pub const FONT_FAMILY: &str = "Inter";
+
 pub const BG: u32 = 0x141417;
 pub const PANEL: u32 = 0x1b1b20;
 pub const PANEL_DRAGGING: u32 = 0x172033;
