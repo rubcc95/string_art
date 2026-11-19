@@ -3,6 +3,11 @@
 ## [Unreleased]
 
 ### Added
+- `string_art_gpui`: English and Spanish UI. The language follows the system by
+  default and can be forced with the new `config.json`
+  (`STRING_ART_LANG` overrides it on native builds).
+- `string_art_gpui`: locale-aware number formatting and parsing through ICU4X,
+  including decimal separators, grouping and plural forms.
 - `string_art_gpui`: `GpuiExec` backend that distributes the sweep over the
   multithreaded pool of `gpui_web` (the dispatcher's `wasm_thread` threads), plus a
   non-blocking `map` on `Parallel` for backends that cannot wait.
@@ -10,6 +15,8 @@
   to `for_each`, so backends that can block pay nothing.
 
 ### Changed
+- `string_art_gpui` now requires Rust 1.88 because of ICU4X. The publishable
+  core crates keep the workspace MSRV of 1.85.
 - `string_art` is no longer generic over the numeric type: it uses 64-bit
   fixed point (`U0F32` for each pixel's energy, `U32F32` for the accumulator).
 - `decay` goes from a generic trait to a `Decay` enum.

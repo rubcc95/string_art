@@ -6,6 +6,7 @@ use gpui::{
     AsyncApp, Context, Div, DragMoveEvent, Entity, ExternalPaths, FileDropEvent, Stateful,
     WeakEntity, Window, prelude::*,
 };
+use rust_i18n::t;
 
 use crate::app::AppView;
 use crate::import::{self, ImportError};
@@ -18,8 +19,8 @@ pub fn init(_view: Entity<AppView>, _app: AsyncApp) {}
 /// Opens the native file picker, filtered to the supported image extensions.
 pub fn pick(window: &mut Window, cx: &mut Context<AppView>) -> bool {
     let dialog = rfd::AsyncFileDialog::new()
-        .add_filter("Images", import::SUPPORTED_EXTENSIONS)
-        .set_title("Select an image")
+        .add_filter(t!("import.formats_filter"), import::SUPPORTED_EXTENSIONS)
+        .set_title(t!("import.pick_title"))
         .set_parent(&*window)
         .pick_file();
 
@@ -100,7 +101,7 @@ fn dropped_name_from(paths: &[PathBuf]) -> String {
     paths
         .first()
         .map(|path| display_name(path))
-        .unwrap_or_else(|| "The dropped file".to_string())
+        .unwrap_or_else(|| t!("import.dropped_name").to_string())
 }
 
 fn spawn_read(path: PathBuf, cx: &mut Context<AppView>) {

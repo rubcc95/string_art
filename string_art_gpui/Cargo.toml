@@ -10,7 +10,9 @@ homepage.workspace = true
 readme.workspace = true
 keywords.workspace = true
 categories.workspace = true
-rust-version.workspace = true
+# ICU4X 2.4 needs Rust 1.88. Only the GUI crate uses it, so the publishable
+# core crates keep the workspace's older MSRV.
+rust-version = "1.88"
 # Not publishable: gpui, gpui_platform and wasm_thread are git dependencies,
 # which crates.io rejects. Set explicitly instead of inheriting `publish`.
 publish = false
@@ -41,6 +43,12 @@ image = { workspace = true, features = [
     "webp",
 ] }
 thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = "1"
+rust-i18n = "4"
+icu_decimal = "2"
+icu_locale_core = "2"
+icu_plurals = "2"
 web-time = "1.1"
 gpui = { git = "https://github.com/zed-industries/zed", default-features = false }
 gpui_platform = { git = "https://github.com/zed-industries/zed", default-features = false }
@@ -50,15 +58,19 @@ gpui_platform = { git = "https://github.com/zed-industries/zed", default-feature
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 rfd = "0.18"
+directories = "6"
+sys-locale = "0.3"
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
+sys-locale = { version = "0.3", features = ["js"] }
 wasm_thread = { git = "https://github.com/zed-industries/wasm_thread", rev = "0cf96c7708dfb97ccf3da50347e25edcf75d6937", features = ["es_modules"], optional = true }
 web-sys = { version = "0.3", features = [
     "AddEventListenerOptions",
     "Blob",
+    "console",
     "DataTransfer",
     "Document",
     "DragEvent",
@@ -70,8 +82,10 @@ web-sys = { version = "0.3", features = [
     "HtmlElement",
     "HtmlInputElement",
     "Node",
+    "Storage",
     "Window",
 ] }
 
 [dev-dependencies]
 gpui = { git = "https://github.com/zed-industries/zed", default-features = false, features = ["bench-support"] }
+serde_yaml = "0.9"

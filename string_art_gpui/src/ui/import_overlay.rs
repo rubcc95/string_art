@@ -4,6 +4,7 @@ use gpui::{
     Animation, AnimationExt as _, Interpolate as _, IntoElement, Rgba, div, ease_out_quint,
     prelude::*, px, rgb, rgba,
 };
+use rust_i18n::t;
 
 use super::{
     ACCENT, BORDER, DRAG_OVERLAY_FADE, ERROR_BG, ERROR_BORDER, ERROR_TEXT, MUTED, PANEL,
@@ -47,29 +48,29 @@ pub fn import_overlay(overlay: DragOverlay) -> impl IntoElement {
         DragHover::Accepted { name: Some(name) } => (
             rgb(ACCENT),
             rgb(PANEL_DRAGGING),
-            format!("Drop to import “{name}”"),
-            Some("Release the file to start the import.".to_string()),
+            t!("import.overlay.accepted_named", name = name).to_string(),
+            Some(t!("import.overlay.release").to_string()),
             MUTED,
         ),
         DragHover::Accepted { name: None } => (
             rgb(ACCENT),
             rgb(PANEL_DRAGGING),
-            "Drop the image to import it".to_string(),
-            Some("Release the file to start the import.".to_string()),
+            t!("import.overlay.accepted").to_string(),
+            Some(t!("import.overlay.release").to_string()),
             MUTED,
         ),
         DragHover::Rejected { name } => (
             rgb(ERROR_BORDER),
             rgb(ERROR_BG),
-            format!("“{name}” is not a supported image"),
-            Some("Use a PNG, JPEG, WebP, GIF, BMP, TIFF, ICO, PNM, QOI or TGA file.".to_string()),
+            t!("import.overlay.rejected", name = name).to_string(),
+            Some(t!("import.overlay.rejected_hint").to_string()),
             ERROR_TEXT,
         ),
         DragHover::Busy => (
             rgb(super::DISABLED),
             rgb(PANEL),
-            "Importing…".to_string(),
-            Some("Wait for the current import to finish, then drop the file again.".to_string()),
+            t!("import.overlay.busy").to_string(),
+            Some(t!("import.overlay.busy_hint").to_string()),
             MUTED,
         ),
     };

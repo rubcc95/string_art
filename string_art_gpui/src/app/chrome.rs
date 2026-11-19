@@ -1,6 +1,7 @@
 //! Window chrome wiring for the application title bar.
 
 use gpui::{Context, Div, Stateful, Window, div, prelude::*, rgb};
+use rust_i18n::t;
 
 use crate::ui;
 
@@ -35,7 +36,7 @@ impl AppView {
             .flex()
             .items_center()
             .text_lg()
-            .child("String Art");
+            .child(t!("app.title").to_string());
 
         // On Linux whether the application owns the chrome depends on the
         // decorations the compositor granted; on the other platforms this is

@@ -13,7 +13,7 @@ impl Workspace {
             .iter()
             .enumerate()
             .map(|(index, computation)| ui::TabItem {
-                label: computation.name.clone().into(),
+                label: computation.name().into(),
                 active: self.active == Some(index),
             })
             .collect::<Vec<_>>();

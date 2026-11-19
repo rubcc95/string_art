@@ -5,6 +5,7 @@ use std::rc::Rc;
 use gpui::{
     AnyElement, App, Div, IntoElement, Pixels, SharedString, Stateful, Window, div, prelude::*, rgb,
 };
+use rust_i18n::t;
 
 use super::{BORDER, MUTED, PANEL, TEXT};
 
@@ -141,6 +142,11 @@ pub fn sidebar_import_button(compact: bool, enabled: bool) -> Stateful<Div> {
     if compact {
         super::icon_button("sidebar-import", "+", enabled).mx_auto()
     } else {
-        super::secondary_button("sidebar-import", "+  Importar imagen", enabled).w_full()
+        super::secondary_button(
+            "sidebar-import",
+            format!("+  {}", t!("sidebar.import")),
+            enabled,
+        )
+        .w_full()
     }
 }

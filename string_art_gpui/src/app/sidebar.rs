@@ -1,7 +1,9 @@
 //! Image sidebar, compact switcher and mobile picker.
 
 use gpui::{Context, Entity, ObjectFit, Window, div, img, prelude::*, px, rgb};
+use rust_i18n::t;
 
+use crate::i18n;
 use crate::ui;
 
 use super::AppView;
@@ -34,7 +36,9 @@ impl AppView {
                         div()
                             .text_xs()
                             .text_color(rgb(ui::FAINT))
-                            .child(workspace.computation_count().to_string())
+                            .child(i18n::format_display_number(
+                                workspace.computation_count() as f64
+                            ))
                             .into_any_element(),
                     ),
                     active: index == active,
@@ -108,12 +112,16 @@ impl AppView {
                         .into_any_element(),
                     title: image.name.clone().into(),
                     subtitle: Some(
-                        format!(
-                            "{} × {} px · {} computaciones",
-                            image.width,
-                            image.height,
-                            workspace.computation_count()
+                        t!(
+                            "sidebar.image_meta",
+                            width = i18n::format_display_number(f64::from(image.width)),
+                            height = i18n::format_display_number(f64::from(image.height)),
+                            computations = i18n::tr_plural(
+                                "sidebar.computations",
+                                workspace.computation_count()
+                            )
                         )
+                        .to_string()
                         .into(),
                     ),
                     trailing: None,
@@ -145,7 +153,7 @@ impl AppView {
             .child(
                 ui::primary_button(
                     "picker-import",
-                    "Importar imagen",
+                    t!("sidebar.import").to_string(),
                     !self.busy && !self.picker_pending,
                 )
                 .w_full()
@@ -159,7 +167,7 @@ impl AppView {
         let entity = cx.entity();
         ui::bottom_sheet(
             "image-picker",
-            "Imágenes",
+            t!("sidebar.title").to_string(),
             content,
             Some(footer),
             move |_, cx| {

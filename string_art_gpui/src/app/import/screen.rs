@@ -1,6 +1,7 @@
 //! Import screen.
 
 use gpui::{Context, Window, div, prelude::*, px, rgb};
+use rust_i18n::t;
 
 use crate::app::AppView;
 use crate::ui;
@@ -18,9 +19,9 @@ impl AppView {
         let drag_rejected = matches!(self.drag_hover, Some(DragHover::Rejected { .. }));
 
         let button_label = if busy {
-            "Importing…"
+            t!("import.busy").to_string()
         } else {
-            "Choose an image"
+            t!("import.choose").to_string()
         };
 
         div()
@@ -74,9 +75,14 @@ impl AppView {
                                         div()
                                             .text_2xl()
                                             .text_color(rgb(ui::TEXT))
-                                            .child("Drop an image here"),
+                                            .child(t!("import.drop_here").to_string()),
                                     )
-                                    .child(div().text_sm().text_color(rgb(ui::MUTED)).child("or"))
+                                    .child(
+                                        div()
+                                            .text_sm()
+                                            .text_color(rgb(ui::MUTED))
+                                            .child(t!("common.or").to_string()),
+                                    )
                                     .child(
                                         ui::primary_button(
                                             "import-image",
@@ -100,10 +106,7 @@ impl AppView {
                                             .text_center()
                                             .text_xs()
                                             .text_color(rgb(ui::FAINT))
-                                            .child(
-                                                "PNG, JPEG, WebP, GIF, BMP, TIFF, ICO, PNM, QOI \
-                                                 and TGA",
-                                            ),
+                                            .child(t!("import.formats").to_string()),
                                     ),
                             ),
                     ),

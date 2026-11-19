@@ -3,7 +3,9 @@
 use gpui::{
     AnyElement, Context, KeyDownEvent, ObjectFit, Window, div, img, prelude::*, px, rgb, size,
 };
+use rust_i18n::t;
 
+use crate::i18n;
 use crate::ui;
 
 use super::Workspace;
@@ -125,7 +127,12 @@ impl Workspace {
 
     fn settings_form(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let name = self.image.name.clone();
-        let dimensions = format!("{} × {} px", self.image.width, self.image.height);
+        let dimensions = t!(
+            "settings.dimensions",
+            width = i18n::format_display_number(f64::from(self.image.width)),
+            height = i18n::format_display_number(f64::from(self.image.height))
+        )
+        .to_string();
         let panel = self.panel.clone();
         let start_focus = self.panel.read(cx).start_focus();
 
@@ -143,7 +150,7 @@ impl Workspace {
                         div()
                             .text_lg()
                             .text_color(rgb(ui::TEXT))
-                            .child("Configuration"),
+                            .child(t!("settings.title").to_string()),
                     )
                     .child(div().text_sm().text_color(rgb(ui::TEXT)).child(name))
                     .child(div().text_xs().text_color(rgb(ui::MUTED)).child(dimensions)),
@@ -151,7 +158,7 @@ impl Workspace {
             .child(panel)
             .child(
                 div().flex().flex_col().gap_2().child(
-                    ui::primary_button("start-computation", "Start", true)
+                    ui::primary_button("start-computation", t!("settings.start").to_string(), true)
                         .w_full()
                         .track_focus(&start_focus)
                         .focus(|style| style.bg(rgb(ui::ACCENT_HOVER)))
@@ -179,18 +186,12 @@ impl Workspace {
             )
     }
 
-    pub(super) fn start_computation(
-        &mut self,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    pub(super) fn start_computation(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.commit_settings(window, cx);
         let settings = self.panel.read(cx).settings();
         let number = self.computations.len() + 1;
-        self.computations.push(super::ComputationTab {
-            name: format!("Computation {number}"),
-            settings,
-        });
+        self.computations
+            .push(super::ComputationTab { number, settings });
         self.active = Some(number - 1);
         cx.emit(super::WorkspaceEvent::ComputationCreated);
         cx.notify();

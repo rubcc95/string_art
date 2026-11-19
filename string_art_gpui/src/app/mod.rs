@@ -9,11 +9,16 @@ mod workspace;
 
 use gpui::{AsyncApp, Context, Entity, Render, Subscription, Window, div, prelude::*, rgb};
 
+use crate::config::Config;
 use crate::ui;
 
 use workspace::Workspace;
 
 pub struct AppView {
+    /// Preferences loaded at startup. Kept here so a future language selector
+    /// can update and save them without another global.
+    #[allow(dead_code)]
+    config: Config,
     workspaces: Vec<Entity<Workspace>>,
     active_workspace: Option<usize>,
     /// Keeps the workspace -> shell subscriptions alive.
@@ -47,8 +52,9 @@ pub fn init_import(view: Entity<AppView>, app: AsyncApp) {
 }
 
 impl AppView {
-    pub fn new(_cx: &mut Context<Self>) -> Self {
+    pub fn new(config: Config, _cx: &mut Context<Self>) -> Self {
         Self {
+            config,
             workspaces: Vec::new(),
             active_workspace: None,
             _workspace_subscriptions: Vec::new(),
@@ -64,6 +70,11 @@ impl AppView {
             titlebar_should_move: false,
             window_subscriptions: Vec::new(),
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn config(&self) -> &Config {
+        &self.config
     }
 
     /// Commits any in-progress numeric edit in the active workspace.

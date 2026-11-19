@@ -5,11 +5,15 @@
 mod app;
 #[allow(dead_code)]
 mod bench;
+mod config;
 #[cfg(feature = "multithreaded")]
 #[allow(dead_code)]
 mod exec;
+mod i18n;
 mod import;
 mod ui;
+
+rust_i18n::i18n!("locales", fallback = "en");
 
 use std::borrow::Cow;
 
@@ -18,6 +22,7 @@ use gpui::{
     point, px, size,
 };
 use gpui_platform::application;
+use rust_i18n::t;
 
 fn run() {
     application().run(|cx: &mut App| {
@@ -31,8 +36,13 @@ fn run() {
             ])
             .expect("failed to load application fonts");
 
+        // The configuration has to be read before any translated text is
+        // produced, and the locale has to be set before the first render.
+        let config = config::Config::load();
+        i18n::init(&config);
+
         let restore_bounds = Bounds::centered(None, size(px(1280.), px(800.)), cx);
-        let view = cx.new(app::AppView::new);
+        let view = cx.new(|cx| app::AppView::new(config, cx));
         let window_view = view.clone();
 
         cx.open_window(
@@ -41,7 +51,7 @@ fn run() {
                 // title bar. On macOS the traffic lights stay native and are
                 // positioned to match the title bar height.
                 titlebar: Some(TitlebarOptions {
-                    title: Some("String Art".into()),
+                    title: Some(t!("app.title").to_string().into()),
                     appears_transparent: true,
                     traffic_light_position: Some(point(px(18.), px(22.))),
                 }),

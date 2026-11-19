@@ -5,6 +5,7 @@ use std::rc::Rc;
 use gpui::{
     AnyElement, App, MouseButton, SharedString, Window, div, prelude::*, relative, rgb, rgba,
 };
+use rust_i18n::t;
 
 use super::{BORDER, MUTED, PANEL, TEXT};
 
@@ -69,7 +70,7 @@ pub fn bottom_sheet(
                                 .cursor_pointer()
                                 .hover(|style| style.text_color(rgb(TEXT)))
                                 .on_click(move |_, window, cx| button_close(window, cx))
-                                .child("Cerrar"),
+                                .child(t!("common.close").to_string()),
                         ),
                 )
                 .child(content)

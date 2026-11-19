@@ -7,6 +7,7 @@
 use std::path::Path;
 
 use gpui::{AsyncApp, Context, Div, Entity, Stateful, Window};
+use rust_i18n::t;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
@@ -245,7 +246,7 @@ fn read_and_import(file: File, view: Entity<AppView>, app: AsyncApp) {
             }
             None => {
                 let _ = view.update(&mut app, |this, cx| {
-                    this.import_error("The selected file could not be read.".to_string(), cx)
+                    this.import_error(t!("import.error.unreadable").to_string(), cx)
                 });
             }
         }

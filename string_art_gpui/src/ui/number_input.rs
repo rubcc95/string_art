@@ -9,11 +9,13 @@ use std::sync::Arc;
 
 use gpui::{
     App, Bounds, ClipboardItem, Context, CursorStyle, Element, ElementId, ElementInputHandler,
-    Entity, EntityInputHandler, EventEmitter, FocusHandle, Focusable, FontFeatures, GlobalElementId,
-    InspectorElementId, KeyDownEvent, LayoutId, PaintQuad, Pixels, Point, ShapedLine, SharedString,
-    Style, Subscription, TextAlign, TextRun, UTF16Selection, UnderlineStyle, Window, div, fill,
-    point, prelude::*, px, relative, rgb, rgba, size,
+    Entity, EntityInputHandler, EventEmitter, FocusHandle, Focusable, FontFeatures,
+    GlobalElementId, InspectorElementId, KeyDownEvent, LayoutId, PaintQuad, Pixels, Point,
+    ShapedLine, SharedString, Style, Subscription, TextAlign, TextRun, UTF16Selection,
+    UnderlineStyle, Window, div, fill, point, prelude::*, px, relative, rgb, rgba, size,
 };
+
+use crate::i18n;
 
 use super::{ACCENT, BG, BORDER, FAINT, TEXT};
 
@@ -61,7 +63,7 @@ impl NumberInput {
         Self {
             focus_handle: cx.focus_handle().tab_stop(true),
             value,
-            text: format_value(value, options.decimals),
+            text: i18n::format_editable_number(value, options.decimals),
             editing: false,
             selected_range: 0..0,
             selection_reversed: false,
@@ -84,7 +86,7 @@ impl NumberInput {
     pub fn set_value(&mut self, value: f64, cx: &mut Context<Self>) {
         self.value = normalize(value, self.min, self.max, self.decimals);
         if !self.editing {
-            self.text = format_value(self.value, self.decimals);
+            self.text = i18n::format_editable_number(self.value, self.decimals);
         }
         cx.notify();
     }
@@ -94,7 +96,7 @@ impl NumberInput {
         self.max = max;
         self.value = normalize(self.value, self.min, self.max, self.decimals);
         if !self.editing {
-            self.text = format_value(self.value, self.decimals);
+            self.text = i18n::format_editable_number(self.value, self.decimals);
         }
         cx.notify();
     }
@@ -105,10 +107,10 @@ impl NumberInput {
             return;
         }
         let previous = self.value;
-        if let Ok(value) = self.text.trim().parse::<f64>() {
+        if let Some(value) = i18n::parse_number(&self.text) {
             self.value = normalize(value, self.min, self.max, self.decimals);
         }
-        self.text = format_value(self.value, self.decimals);
+        self.text = i18n::format_editable_number(self.value, self.decimals);
         self.editing = false;
         self.marked_range = None;
         self.last_layout = None;
@@ -124,7 +126,7 @@ impl NumberInput {
         if !self.editing {
             return;
         }
-        self.text = format_value(self.value, self.decimals);
+        self.text = i18n::format_editable_number(self.value, self.decimals);
         self.editing = false;
         self.marked_range = None;
         self.last_layout = None;
@@ -150,7 +152,7 @@ impl NumberInput {
             cx.notify();
             return;
         }
-        self.text = format_value(self.value, self.decimals);
+        self.text = i18n::format_editable_number(self.value, self.decimals);
         self.selected_range = 0..self.text.len();
         self.selection_reversed = false;
         self.marked_range = None;
@@ -340,11 +342,12 @@ impl NumberInput {
         let before = self.text[..range.start].to_string();
         let after = self.text[range.end..].to_string();
         let mut insert = sanitize_text(text, self.decimals > 0);
+        let has_separator = |value: &str| value.contains('.') || value.contains(',');
         if self.decimals > 0
-            && insert.contains('.')
-            && (before.contains('.') || after.contains('.'))
+            && has_separator(&insert)
+            && (has_separator(&before) || has_separator(&after))
         {
-            insert = insert.replace('.', "");
+            insert.retain(|character| character != '.' && character != ',');
         }
 
         self.text = format!("{before}{insert}{after}");
@@ -398,23 +401,15 @@ fn normalize(value: f64, min: f64, max: f64, decimals: u8) -> f64 {
     (value * factor).round() / factor
 }
 
-fn format_value(value: f64, decimals: u8) -> String {
-    if decimals == 0 {
-        format!("{}", value.round() as i64)
-    } else {
-        format!("{value:.prec$}", prec = usize::from(decimals))
-    }
-}
-
 fn sanitize_text(text: &str, allow_decimal: bool) -> String {
     let mut out = String::new();
-    let mut has_dot = false;
+    let mut has_separator = false;
     for ch in text.chars() {
         if ch.is_ascii_digit() {
             out.push(ch);
-        } else if ch == '.' && allow_decimal && !has_dot {
-            has_dot = true;
-            out.push('.');
+        } else if (ch == '.' || ch == ',') && allow_decimal && !has_separator {
+            has_separator = true;
+            out.push(ch);
         }
         if out.len() >= 12 {
             break;
@@ -592,7 +587,7 @@ impl Render for NumberInput {
         let editing = self.editing;
         let focused = self.focus_handle.is_focused(window);
         let suffix = self.suffix.clone();
-        let value = format_value(self.value, self.decimals);
+        let value = i18n::format_editable_number(self.value, self.decimals);
 
         div()
             .h(px(34.))

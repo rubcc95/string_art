@@ -1,5 +1,7 @@
 //! Computation settings model, independent from the UI.
 
+use rust_i18n::t;
+
 /// Smallest physical size of the work, in centimetres.
 const MIN_SIZE_CM: f64 = 10.;
 /// Largest physical size of the work, in centimetres.
@@ -155,35 +157,37 @@ impl SettingField {
         Self::Height,
     ];
 
-    pub fn label(self) -> &'static str {
+    pub fn label(self) -> String {
         match self {
-            Self::Nails => "Número de clavos",
-            Self::MinDistance => "Distancia mínima",
-            Self::Radius => "Radio del clavo",
-            Self::ThreadWidth => "Ancho del hilo",
-            Self::Decay => "Decaimiento",
-            Self::Width => "Ancho de la imagen",
-            Self::Height => "Alto de la imagen",
+            Self::Nails => t!("settings.nails.label"),
+            Self::MinDistance => t!("settings.min_distance.label"),
+            Self::Radius => t!("settings.radius.label"),
+            Self::ThreadWidth => t!("settings.thread_width.label"),
+            Self::Decay => t!("settings.decay.label"),
+            Self::Width => t!("settings.width.label"),
+            Self::Height => t!("settings.height.label"),
         }
+        .to_string()
     }
 
-    pub fn hint(self) -> &'static str {
+    pub fn hint(self) -> String {
         match self {
-            Self::Nails => "Clavos repartidos por el borde de la imagen",
-            Self::MinDistance => "Mínimo de clavos entre dos anclajes",
-            Self::Radius => "Radio de cada clavo, en píxeles",
-            Self::ThreadWidth => "Grosor del hilo, en píxeles",
-            Self::Decay => "Cantidad de energía que se resta al pasar el hilo",
-            Self::Width => "Ancho físico de la obra, en centímetros",
-            Self::Height => "Alto físico de la obra, en centímetros",
+            Self::Nails => t!("settings.nails.hint"),
+            Self::MinDistance => t!("settings.min_distance.hint"),
+            Self::Radius => t!("settings.radius.hint"),
+            Self::ThreadWidth => t!("settings.thread_width.hint"),
+            Self::Decay => t!("settings.decay.hint"),
+            Self::Width => t!("settings.width.hint"),
+            Self::Height => t!("settings.height.hint"),
         }
+        .to_string()
     }
 
-    pub fn suffix(self) -> &'static str {
+    pub fn suffix(self) -> String {
         match self {
-            Self::Nails | Self::MinDistance | Self::Decay => "",
-            Self::Radius | Self::ThreadWidth => "px",
-            Self::Width | Self::Height => "cm",
+            Self::Nails | Self::MinDistance | Self::Decay => String::new(),
+            Self::Radius | Self::ThreadWidth => t!("units.px").to_string(),
+            Self::Width | Self::Height => t!("units.cm").to_string(),
         }
     }
 

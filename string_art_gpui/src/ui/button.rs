@@ -4,7 +4,7 @@ use gpui::{Div, Stateful, div, prelude::*, rgb};
 
 use super::{ACCENT, ACCENT_HOVER, BORDER, DISABLED, DISABLED_TEXT, MUTED, TEXT};
 
-pub fn primary_button(id: &'static str, label: &str, enabled: bool) -> Stateful<Div> {
+pub fn primary_button(id: &'static str, label: impl AsRef<str>, enabled: bool) -> Stateful<Div> {
     div()
         .id(id)
         .flex()
@@ -21,10 +21,10 @@ pub fn primary_button(id: &'static str, label: &str, enabled: bool) -> Stateful<
                 .cursor_pointer()
                 .hover(|style| style.bg(rgb(ACCENT_HOVER)))
         })
-        .child(label.to_string())
+        .child(label.as_ref().to_string())
 }
 
-pub fn secondary_button(id: &'static str, label: &str, enabled: bool) -> Stateful<Div> {
+pub fn secondary_button(id: &'static str, label: impl AsRef<str>, enabled: bool) -> Stateful<Div> {
     div()
         .id(id)
         .flex()
@@ -43,10 +43,10 @@ pub fn secondary_button(id: &'static str, label: &str, enabled: bool) -> Statefu
                 .cursor_pointer()
                 .hover(|style| style.bg(rgb(0x232429)).text_color(rgb(TEXT)))
         })
-        .child(label.to_string())
+        .child(label.as_ref().to_string())
 }
 
-pub fn icon_button(id: &'static str, label: &str, enabled: bool) -> Stateful<Div> {
+pub fn icon_button(id: &'static str, label: impl AsRef<str>, enabled: bool) -> Stateful<Div> {
     div()
         .id(id)
         .flex()
@@ -63,5 +63,5 @@ pub fn icon_button(id: &'static str, label: &str, enabled: bool) -> Stateful<Div
                 .cursor_pointer()
                 .hover(|style| style.bg(rgb(0x232429)).text_color(rgb(TEXT)))
         })
-        .child(label.to_string())
+        .child(label.as_ref().to_string())
 }

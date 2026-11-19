@@ -4,13 +4,16 @@ mod ellipse;
 mod settings;
 mod tabs;
 
-use gpui::{AnyElement, Context, Entity, EventEmitter, Render, Subscription, Window, div, prelude::*};
+use gpui::{
+    AnyElement, Context, Entity, EventEmitter, Render, Subscription, Window, div, prelude::*,
+};
+use rust_i18n::t;
 
 use crate::import::ImportedImage;
 use crate::ui;
 
-use super::settings::{Settings, SettingsPanel, SettingsPanelEvent};
 use super::AppView;
+use super::settings::{Settings, SettingsPanel, SettingsPanelEvent};
 
 pub(crate) use ellipse::EllipseState;
 
@@ -35,10 +38,18 @@ pub(crate) struct Workspace {
 
 /// One computation started from an image's settings.
 pub(crate) struct ComputationTab {
-    name: String,
+    number: usize,
     /// The settings the computation was started with.
     #[allow(dead_code)] // Used once computations actually run.
     settings: Settings,
+}
+
+impl ComputationTab {
+    /// The name is resolved on every render, so it follows a language change
+    /// instead of being frozen when the tab is created.
+    pub(super) fn name(&self) -> String {
+        t!("computation.name", number = self.number).to_string()
+    }
 }
 
 impl EventEmitter<WorkspaceEvent> for Workspace {}
@@ -84,19 +95,13 @@ impl Workspace {
         cx.notify();
     }
 
-    fn content(
-        &mut self,
-        split: bool,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
+    fn content(&mut self, split: bool, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         match self.active.and_then(|active| self.computations.get(active)) {
             None => self.settings_view(split, window, cx).into_any_element(),
-            Some(computation) => ui::empty_state(
-                computation.name.clone(),
-                "El resultado de la computación aparecerá aquí.",
-            )
-            .into_any_element(),
+            Some(computation) => {
+                ui::empty_state(computation.name(), t!("workspace.empty").to_string())
+                    .into_any_element()
+            }
         }
     }
 
@@ -116,12 +121,7 @@ impl Workspace {
 impl Render for Workspace {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let split = Self::split_layout(window);
-        let mut main = div()
-            .flex_1()
-            .min_w_0()
-            .min_h_0()
-            .flex()
-            .flex_col();
+        let mut main = div().flex_1().min_w_0().min_h_0().flex().flex_col();
 
         if !self.computations.is_empty() {
             main = main.child(self.computation_tabs(cx));

@@ -8,6 +8,7 @@ use gpui::RenderImage;
 use image::{
     DynamicImage, GenericImageView as _, ImageDecoder as _, ImageFormat, ImageReader, RgbaImage,
 };
+use rust_i18n::t;
 
 /// Largest side accepted after decoding, before any downscaling.
 const MAX_DIMENSION: u32 = 8192;
@@ -78,10 +79,7 @@ pub fn select_drop_path(paths: &[PathBuf]) -> Option<&PathBuf> {
 /// Error shown when the user picks or drops a file with a known but
 /// unsupported extension, such as a video.
 pub fn unsupported_file_message(name: &str) -> String {
-    format!(
-        "“{name}” is not a supported image. Choose a PNG, JPEG, WebP, GIF, BMP, TIFF, ICO, PNM, \
-         QOI or TGA file."
-    )
+    t!("import.error.unsupported_file", name = name).to_string()
 }
 
 /// Decodes an image from its bytes.
@@ -183,6 +181,20 @@ pub enum ImportError {
     Decode(String),
     #[error("The image is too large (max. 8192 px per side and 40 megapixels)")]
     TooLarge,
+}
+
+impl ImportError {
+    /// The message shown to the user. `Display` stays in English because it is
+    /// also used by logs and tests; only the UI is localized.
+    pub fn localized(&self) -> String {
+        match self {
+            #[cfg(not(target_family = "wasm"))]
+            Self::Read(error) => t!("import.error.read", error = error).to_string(),
+            Self::UnsupportedFormat => t!("import.error.unsupported").to_string(),
+            Self::Decode(error) => t!("import.error.decode", error = error).to_string(),
+            Self::TooLarge => t!("import.error.too_large").to_string(),
+        }
+    }
 }
 
 #[cfg(test)]

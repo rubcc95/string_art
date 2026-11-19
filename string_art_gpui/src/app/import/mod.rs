@@ -5,6 +5,7 @@ mod screen;
 pub(super) mod sources;
 
 use gpui::{AppContext as _, Context, Window};
+use rust_i18n::t;
 
 use crate::import::{ImportError, ImportedImage, decode};
 use crate::ui;
@@ -39,7 +40,13 @@ impl AppView {
                 self.active_workspace = Some(self.workspaces.len() - 1);
             }
             Err(error) => {
-                self.toast(Toast::error("Import failed", Some(error.to_string())), cx);
+                self.toast(
+                    Toast::error(
+                        t!("import.error.title").to_string(),
+                        Some(error.localized()),
+                    ),
+                    cx,
+                );
             }
         }
         cx.notify();
@@ -155,7 +162,10 @@ impl AppView {
     /// Reports an import failure without leaving the import UI in a busy state.
     pub fn import_error(&mut self, message: String, cx: &mut Context<Self>) {
         self.busy = false;
-        self.toast(Toast::error("Import failed", Some(message)), cx);
+        self.toast(
+            Toast::error(t!("import.error.title").to_string(), Some(message)),
+            cx,
+        );
     }
 
     /// Drop feedback for platforms that only report whether files are over the
