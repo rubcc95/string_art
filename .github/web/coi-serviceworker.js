@@ -38,7 +38,17 @@ if (typeof window === "undefined") {
 		}
 		event.respondWith(
 			(async () => {
-				const response = await fetch(request);
+				let response;
+				try {
+					response = await fetch(request);
+				} catch {
+					// The request was aborted or failed at the network level:
+					// the first-visit reload, a canceled navigation, an aborted
+					// wasm download, etc. There is nothing to rewrite, and
+					// letting the rejection escape only logs an uncaught
+					// "Failed to fetch" in the console.
+					return Response.error();
+				}
 				if (response.status === 0 || response.type === "opaque") {
 					return response;
 				}
