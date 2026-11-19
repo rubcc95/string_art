@@ -30,6 +30,12 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: "1"
+  # Pinned nightly. Swatinem/rust-cache includes the rustc version of every
+  # installed toolchain in its cache key, so with the rolling `nightly` channel
+  # that hash changes every day: the cache gets saved but never restored, and
+  # `-Z build-std` rebuilds std from scratch. Bump the date when a newer
+  # nightly is wanted.
+  NIGHTLY_TOOLCHAIN: nightly-2026-11-19
 
 jobs:
   deploy:
@@ -46,7 +52,7 @@ jobs:
       - name: Install Rust
         run: |
           if [ "${{ inputs.threads || 'true' }}" = "true" ]; then
-            rustup toolchain install nightly --profile minimal \
+            rustup toolchain install "$NIGHTLY_TOOLCHAIN" --profile minimal \
               --component rust-src --target wasm32-unknown-unknown
           else
             rustup toolchain install stable --profile minimal \
@@ -77,7 +83,7 @@ jobs:
             flags+=(--release)
           fi
           if [ "$THREADS" = "true" ]; then
-            cargo +nightly web --locked "${flags[@]}"
+            cargo "+$NIGHTLY_TOOLCHAIN" web --locked "${flags[@]}"
           else
             cargo web-serial --locked "${flags[@]}"
           fi
