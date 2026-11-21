@@ -31,6 +31,14 @@ image = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 
 [features]
-default = ["image"]
+default = ["image", "clip", "cached"]
 image = ["dep:image", "string_art_color/image"]
+# Built-in pixel walkers. Disable the ones you do not use, or both to plug your
+# own `PixelWalk` implementation.
+clip = []
+cached = []
 serde = ["dep:serde", "string_art_geometry/serde", "fixed/serde"]
+
+[[bench]]
+name = "walk"
+harness = false

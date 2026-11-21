@@ -1,6 +1,11 @@
 use std::iter::FusedIterator;
 
 use crate::num::Frac;
+#[cfg(feature = "clip")]
+use crate::walk::Clip;
+use crate::walk::PixelWalk;
+#[cfg(feature = "cached")]
+use crate::walk::{CacheTooLarge, Cached};
 use crate::*;
 use board::*;
 use geometry::Rect;
@@ -22,40 +27,41 @@ pub trait Pipeline: Iterator<Item = Self::Index> {
     fn color_maps_mut(&mut self) -> &mut [ColorMap<Self::Anchor, Self::Color>];
 }
 
-pub trait ComputationExecutor<B, P>:
-    for<'a> Executor<WorkBuffer<P>, ComputationWork<'a, B, P>>
+pub trait ComputationExecutor<B, P, W>:
+    for<'a> Executor<WorkBuffer<P>, ComputationWork<'a, B, P, W>>
 where
     B: Board,
     P: Pipeline<Anchor = B::Anchor>,
+    W: PixelWalk,
 {
 }
 
-impl<T, B, P> ComputationExecutor<B, P> for T
+impl<T, B, P, W> ComputationExecutor<B, P, W> for T
 where
-    T: for<'a> Executor<WorkBuffer<P>, ComputationWork<'a, B, P>>,
+    T: for<'a> Executor<WorkBuffer<P>, ComputationWork<'a, B, P, W>>,
     B: Board,
     P: Pipeline<Anchor = B::Anchor>,
+    W: PixelWalk,
 {
 }
 use internal::*;
 mod internal {
 
-    use super::Pipeline;
-    use crate::{
-        Board, Frac, Scalar, Work, board::SegmentRef as _, geometry::Rect, scalar_from_frac,
-    };
+    use super::{Pipeline, PixelWalk};
+    use crate::{Board, Frac, Scalar, Work, board::SegmentRef as _};
 
-    pub struct ComputationWork<'a, B, P: Pipeline> {
+    pub struct ComputationWork<'a, B, P: Pipeline, W> {
         pub board: &'a B,
-        pub rect: &'a Rect<usize>,
         pub anchor: &'a P::Anchor,
         pub weights: &'a [Frac],
+        pub walk: &'a W,
     }
 
-    impl<'a, B, P> Work<WorkBuffer<P>> for ComputationWork<'a, B, P>
+    impl<'a, B, P, W> Work<WorkBuffer<P>> for ComputationWork<'a, B, P, W>
     where
         B: Board,
         P: Pipeline<Anchor = B::Anchor>,
+        W: PixelWalk,
     {
         fn run(&self, i: usize, next_line: &mut WorkBuffer<P>) {
             *next_line = None;
@@ -65,19 +71,9 @@ mod internal {
                     continue;
                 }
 
-                let weight = {
-                    let mut count = 0u32;
-                    let mut weight = Scalar::ZERO;
-                    for idx in self.rect.get_pixel_indexes_in_segment(board_segment) {
-                        weight += scalar_from_frac(self.weights[idx]);
-                        count += 1;
-                    }
-                    if count > 0 {
-                        weight / Scalar::from_num(count)
-                    } else {
-                        Scalar::ZERO
-                    }
-                };
+                let weight = self
+                    .walk
+                    .accumulate(segment.index(), board_segment, self.weights);
 
                 let better = match next_line {
                     Some(current) => {
@@ -125,21 +121,25 @@ mod internal {
     }
 }
 
-pub struct Computation<B, P: Pipeline, X> {
+pub struct Computation<B, P: Pipeline, X, W: PixelWalk> {
     pipeline: P,
-    inner: Inner<B, P, X>,
+    inner: Inner<B, P, X, W>,
 }
 
 #[derive(Debug, thiserror::Error)]
 #[error("The length of the color map buffer does not match the length of the rectangle area.")]
 pub struct RectAreaError;
 
-impl<B, P, X> Computation<B, P, X>
-where
-    B: Board,
-    P: Pipeline<Anchor = B::Anchor>,
-    X: for<'a> Executor<WorkBuffer<P>, ComputationWork<'a, B, P>>,
-{
+#[cfg(feature = "cached")]
+#[derive(Debug, thiserror::Error)]
+pub enum CachedError {
+    #[error(transparent)]
+    Area(#[from] RectAreaError),
+    #[error(transparent)]
+    Cache(#[from] CacheTooLarge),
+}
+
+impl<B, P: Pipeline, X, W: PixelWalk> Computation<B, P, X, W> {
     pub fn board(&self) -> &B {
         &self.inner.board
     }
@@ -153,23 +153,41 @@ where
     pub fn par(&self) -> &X {
         &self.inner.par
     }
+    /// The pixel walker it was created with.
+    pub fn walk(&self) -> &W {
+        &self.inner.walk
+    }
+}
 
-    pub fn new<T: IntoBoard<Board = B>>(
+impl<B, P, X, W> Computation<B, P, X, W>
+where
+    B: Board,
+    P: Pipeline<Anchor = B::Anchor>,
+    W: PixelWalk,
+    X: for<'a> Executor<WorkBuffer<P>, ComputationWork<'a, B, P, W>>,
+{
+    /// Builds the computation from an already-constructed board.
+    ///
+    /// `board` must have been produced with the same executor: its batches are
+    /// sized from `par.workers()`.
+    pub fn with_board(
         par: X,
         pipeline: P,
-        into_board: T,
+        board: B,
         rect: Rect<usize>,
         decay: decay::Decay,
+        walk: W,
     ) -> Result<Self, RectAreaError> {
         let workers = par.workers();
         let mut this = Self {
             pipeline,
             inner: Inner {
                 par,
-                board: into_board.into_board(workers),
+                board,
                 rect,
                 bufs: vec![None; workers],
                 decay,
+                walk,
             },
         };
         let map_len = this.inner.rect.area();
@@ -183,13 +201,73 @@ where
         }
         Ok(this)
     }
+
+    /// Builds the computation with a walker derived from the constructed board.
+    pub fn new_with<T: IntoBoard<Board = B>>(
+        par: X,
+        pipeline: P,
+        into_board: T,
+        rect: Rect<usize>,
+        decay: decay::Decay,
+        make_walk: impl FnOnce(&B) -> W,
+    ) -> Result<Self, RectAreaError> {
+        let workers = par.workers();
+        let board = into_board.into_board(workers);
+        let walk = make_walk(&board);
+        Self::with_board(par, pipeline, board, rect, decay, walk)
+    }
 }
 
-impl<B, P, X> Iterator for Computation<B, P, X>
+#[cfg(feature = "clip")]
+impl<B, P, X> Computation<B, P, X, Clip>
 where
     B: Board,
     P: Pipeline<Anchor = B::Anchor>,
-    X: for<'a> Executor<WorkBuffer<P>, ComputationWork<'a, B, P>>,
+    X: for<'a> Executor<WorkBuffer<P>, ComputationWork<'a, B, P, Clip>>,
+{
+    pub fn new<T: IntoBoard<Board = B>>(
+        par: X,
+        pipeline: P,
+        into_board: T,
+        rect: Rect<usize>,
+        decay: decay::Decay,
+    ) -> Result<Self, RectAreaError> {
+        Self::new_with(par, pipeline, into_board, rect, decay, |_| Clip::new(rect))
+    }
+}
+
+#[cfg(feature = "cached")]
+impl<B, P, X> Computation<B, P, X, Cached>
+where
+    B: Board,
+    P: Pipeline<Anchor = B::Anchor>,
+    X: for<'a> Executor<WorkBuffer<P>, ComputationWork<'a, B, P, Cached>>,
+{
+    /// Builds the computation with a fully precomputed line cache.
+    ///
+    /// `max_bytes` is a hard budget: if the cache would not fit, this returns
+    /// [`CachedError::Cache`] before allocating anything.
+    pub fn new_cached<T: IntoBoard<Board = B>>(
+        par: X,
+        pipeline: P,
+        into_board: T,
+        rect: Rect<usize>,
+        decay: decay::Decay,
+        max_bytes: usize,
+    ) -> Result<Self, CachedError> {
+        let workers = par.workers();
+        let board = into_board.into_board(workers);
+        let walk = Cached::from_board(&board, rect, max_bytes)?;
+        Ok(Self::with_board(par, pipeline, board, rect, decay, walk)?)
+    }
+}
+
+impl<B, P, X, W> Iterator for Computation<B, P, X, W>
+where
+    B: Board,
+    P: Pipeline<Anchor = B::Anchor>,
+    W: PixelWalk,
+    X: for<'a> Executor<WorkBuffer<P>, ComputationWork<'a, B, P, W>>,
 {
     type Item = Result<Step<P>, StepError>;
 
@@ -203,14 +281,12 @@ where
                 };
                 segment.set_used();
                 let anchor = core::mem::replace(&mut map.anchor, line.anchor);
-                for point in self
-                    .inner
-                    .rect
-                    .get_pixel_indexes_in_segment(segment.get_segment())
-                {
-                    let weight = &mut map.weights[point];
-                    *weight = self.inner.decay.compute(*weight);
-                }
+                self.inner.walk.apply_decay(
+                    line.segment_idx,
+                    segment.get_segment(),
+                    &mut map.weights,
+                    self.inner.decay,
+                );
                 Ok(Step {
                     color: index,
                     anchor,
@@ -225,22 +301,24 @@ where
     }
 }
 
-impl<B, P, X> ExactSizeIterator for Computation<B, P, X>
+impl<B, P, X, W> ExactSizeIterator for Computation<B, P, X, W>
 where
     B: Board,
     P: Pipeline<Anchor = B::Anchor> + ExactSizeIterator,
-    X: for<'a> Executor<WorkBuffer<P>, ComputationWork<'a, B, P>>,
+    W: PixelWalk,
+    X: for<'a> Executor<WorkBuffer<P>, ComputationWork<'a, B, P, W>>,
 {
     fn len(&self) -> usize {
         self.pipeline.len()
     }
 }
 
-impl<B, P, X> FusedIterator for Computation<B, P, X>
+impl<B, P, X, W> FusedIterator for Computation<B, P, X, W>
 where
     B: Board,
     P: Pipeline<Anchor = B::Anchor> + FusedIterator,
-    X: for<'a> Executor<WorkBuffer<P>, ComputationWork<'a, B, P>>,
+    W: PixelWalk,
+    X: for<'a> Executor<WorkBuffer<P>, ComputationWork<'a, B, P, W>>,
 {
 }
 
@@ -248,19 +326,21 @@ where
 #[error("Computation error")]
 pub struct StepError;
 
-struct Inner<B, P: Pipeline, X> {
+struct Inner<B, P: Pipeline, X, W> {
     par: X,
     board: B,
     decay: decay::Decay,
     rect: Rect<usize>,
     bufs: Vec<WorkBuffer<P>>,
+    walk: W,
 }
 
-impl<B, P, X> Inner<B, P, X>
+impl<B, P, X, W> Inner<B, P, X, W>
 where
     B: Board,
     P: Pipeline<Anchor = B::Anchor>,
-    X: for<'a> Executor<WorkBuffer<P>, ComputationWork<'a, B, P>>,
+    W: PixelWalk,
+    X: for<'a> Executor<WorkBuffer<P>, ComputationWork<'a, B, P, W>>,
 {
     fn get_best_line(
         &mut self,
@@ -268,9 +348,9 @@ where
     ) -> Option<NextLine<B::Anchor>> {
         let work = ComputationWork {
             board: &self.board,
-            rect: &self.rect,
             anchor: &map.anchor,
             weights: &map.weights,
+            walk: &self.walk,
         };
         self.par.for_each(&mut self.bufs, work);
         self.bufs

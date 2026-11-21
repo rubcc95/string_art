@@ -39,17 +39,27 @@ pub struct Segment {
 
 impl From<Seg> for Segment {
     fn from(segment: Seg) -> Self {
-        Self { segment, is_used: false }
+        Self {
+            segment,
+            is_used: false,
+        }
     }
 }
 
 impl Segment {
     pub fn new(segment: Seg) -> Self {
-        Self { segment, is_used: false }
+        Self {
+            segment,
+            is_used: false,
+        }
     }
 
-    pub fn get_segment(&self) -> &Seg { &self.segment }
-    pub fn is_used(&self) -> bool { self.is_used }
+    pub fn get_segment(&self) -> &Seg {
+        &self.segment
+    }
+    pub fn is_used(&self) -> bool {
+        self.is_used
+    }
 
     pub fn set_used(&mut self) {
         debug_assert_eq!(self.is_used, false);

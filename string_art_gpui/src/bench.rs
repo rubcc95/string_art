@@ -1,5 +1,5 @@
 use string_art::{
-    Computation, Decay, Ellipse, Frac, Monocolor,
+    Clip, Computation, Decay, Ellipse, Frac, Monocolor,
     board::IntoBoard,
     computation::ComputationExecutor,
     geometry::Rect,
@@ -25,7 +25,9 @@ fn test_image(size: u32) -> image::RgbImage {
 
 /// Same as [`run`], but returns the time of the computation phase (the
 /// [`STEPS`] steps), not counting image, map, and board preparation.
-pub fn run_timed<X: ComputationExecutor<BenchBoard, Monocolor<Anchor<Direction>>>>(par: X) -> f64 {
+pub fn run_timed<X: ComputationExecutor<BenchBoard, Monocolor<Anchor<Direction>>, Clip>>(
+    par: X,
+) -> f64 {
     let image = test_image(SIZE);
     let monocolor: Monocolor<Anchor<Direction>> = Monocolor::from_image(&image, STEPS);
     let board = Ellipse::new(
@@ -53,7 +55,7 @@ pub fn run_timed<X: ComputationExecutor<BenchBoard, Monocolor<Anchor<Direction>>
     start.elapsed().as_secs_f64() * 1000.0
 }
 
-pub fn run<X: ComputationExecutor<BenchBoard, Monocolor<Anchor<Direction>>>>(par: X) {
+pub fn run<X: ComputationExecutor<BenchBoard, Monocolor<Anchor<Direction>>, Clip>>(par: X) {
     let _ = run_timed(par);
 }
 

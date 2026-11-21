@@ -3,6 +3,18 @@
 ## [Unreleased]
 
 ### Added
+- `string_art`: pluggable pixel traversal through the `walk` module. `Clip`
+  walks each segment on demand (the default) and `Cached` precomputes the pixel
+  list of every board segment with a hard memory budget.
+- `string_art`: `Computation::new_cached` and `Computation::new_with` select the
+  walker at construction; `Computation::with_board` accepts an already-built
+  board. `Computation` gained the walker as a type parameter (`W: PixelWalk`,
+  defaulting to `Clip`), so the choice stays statically dispatched.
+- `string_art`: `Rect::for_each_pixel_index_in_segment`, the hot-path rasterizer
+  with one bounds test per segment instead of one per pixel.
+- `string_art`: the `clip` and `cached` cargo features, both enabled by default.
+  Disabling one removes its walker; disabling both leaves only `PixelWalk` so a
+  consumer can plug its own implementation without paying for the built-ins.
 - `string_art_gpui`: English, Spanish, French, Portuguese, Italian, German,
   Catalan, Galician and Basque UI. The language follows the system by default
   and can be forced with the new `config.json` (`STRING_ART_LANG` overrides it
@@ -16,6 +28,11 @@
   to `for_each`, so backends that can block pay nothing.
 
 ### Changed
+- `string_art`: the computation no longer recomputes Bresenham pairs through
+  `Option`/`NumCast` adapters. The pixel walk is a strategy: `Clip` calls the
+  geometry rasterizer directly and `Cached` reads a precomputed index list.
+- `string_art`: `Rect::get_pixel_indexes_in_segment` and `Segment::bresenham`
+  were removed in favour of `Rect::for_each_pixel_index_in_segment`.
 - `string_art_gpui` now requires Rust 1.88 because of ICU4X. The publishable
   core crates keep the workspace MSRV of 1.85.
 - `string_art` is no longer generic over the numeric type: it uses 64-bit
@@ -32,6 +49,8 @@
   allowed crossing threads with types that are not.
 
 ### Removed
+- `string_art_geometry`: the `bresenham` crate. The rasterizer now lives in
+  `Rect::for_each_pixel_index_in_segment`.
 - The build scaffolding for Android/Termux: the `clippy-driver` wrapper,
   the `.harness` `TMPDIR` and the rest of the `lint.sh` patches.
 - The `gpui` feature of `string_art_gpui`: gpui is no longer optional.

@@ -1,5 +1,4 @@
 use super::Point;
-use bresenham::Bresenham;
 use num_traits::*;
 use std::{fmt, ops::*};
 
@@ -242,12 +241,6 @@ impl<T> Segment<T> {
             start: self.start.as_(),
             end: self.end.as_(),
         }
-    }
-}
-
-impl Segment<isize> {
-    pub fn bresenham(&self) -> impl Iterator<Item = Point<isize>> + use<> {
-        Bresenham::new((self.start.x, self.start.y), (self.end.x, self.end.y)).map(Point::from)
     }
 }
 

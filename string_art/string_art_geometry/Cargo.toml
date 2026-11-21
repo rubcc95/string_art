@@ -17,7 +17,6 @@ publish.workspace = true
 [dependencies]
 num-traits = { workspace = true }
 serde = { workspace = true, optional = true }
-bresenham = "^0.1"
 
 
 [features]
